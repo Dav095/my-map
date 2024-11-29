@@ -1,0 +1,205 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Местоположение вышек</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+            <style>
+                #mapYandex {
+                    width: 100%;
+                    height: 90vh;
+                }
+                #controls {
+                    text-align: center;
+                    padding: 10px;
+                    box-sizing: border-box;
+                }
+                @media (max-width: 768px) {
+                    #mapYandex {
+                        height: 70vh;
+                    }
+                }
+                @media (max-width: 480px) {
+                    #mapYandex {
+                        height: 60vh;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div id="controls">
+                <button onclick="toggleService('Yandex')">Скрыть Yandex</button>
+                <button onclick="toggleService('Mylnikov')">Скрыть Mylnikov</button>
+                <input type="text" id="imeiSearch" placeholder="Введите IMEI для поиска">
+                <button onclick="searchByIMEI()">Найти IMEI</button>
+            </div>
+            <div id="mapYandex"></div>
+            <script type="text/javascript">
+                var myMap;
+                var placemarks = [];
+                var circles = [];
+                var circleVisible = [];
+                var yandexVisible = true;
+                var mylnikovVisible = true;
+
+                ymaps.ready(initYandex);
+                function initYandex() {
+                    myMap = new ymaps.Map("mapYandex", {
+                        center: [55.751244, 37.618423],
+                        zoom: 10
+                    });
+                    
+        var placemark0 = new ymaps.Placemark([60.03216934204102, 30.42235946655273], {
+            balloonContent: 'IMEI: РУЧНОЙ ВВОД<br>Координаты: 60.03216934204102, 30.42235946655273<br>Радиус: 735.1763305664062 м<br>Сервис: Yandex<br><a href="https://yandex.ru/maps/?ll=30.42235946655273%2C60.03216934204102&z=15&l=map&pt=30.42235946655273,60.03216934204102,pm2dgl" target="_blank">Посмотреть на Яндекс.Картах</a><br><button onclick="toggleCircleVisibility(0)">Показать радиус</button><br><button onclick="copyCoordinates(60.03216934204102, 30.42235946655273)">Копировать координаты</button><br><button onclick="removeTower(0)">Удалить вышку</button>' 
+        }, {
+            preset: 'islands#redIcon'
+        });
+        var circle0 = new ymaps.Circle([[60.03216934204102, 30.42235946655273], 735.1763305664062], null, {
+            draggable: false,
+            fillColor: 'rgba(0,0,0,0)',
+            strokeColor: '#FF0000',
+            strokeOpacity: 0.5,
+            strokeWidth: 5
+        });
+        myMap.geoObjects.add(placemark0);
+        placemarks.push(placemark0);
+        circles.push(circle0);
+        circleVisible.push(false);
+    
+
+        var placemark1 = new ymaps.Placemark([60.03483270019, 30.40513983213], {
+            balloonContent: 'IMEI: РУЧНОЙ ВВОД<br>Координаты: 60.03483270019, 30.40513983213<br>Радиус: 500 м<br>Сервис: Mylnikov<br><a href="https://yandex.ru/maps/?ll=30.40513983213%2C60.03483270019&z=15&l=map&pt=30.40513983213,60.03483270019,pm2dgl" target="_blank">Посмотреть на Яндекс.Картах</a><br><button onclick="toggleCircleVisibility(1)">Показать радиус</button><br><button onclick="copyCoordinates(60.03483270019, 30.40513983213)">Копировать координаты</button><br><button onclick="removeTower(1)">Удалить вышку</button>' 
+        }, {
+            preset: 'islands#blueIcon'
+        });
+        var circle1 = new ymaps.Circle([[60.03483270019, 30.40513983213], 500], null, {
+            draggable: false,
+            fillColor: 'rgba(0,0,0,0)',
+            strokeColor: '#0000FF',
+            strokeOpacity: 0.5,
+            strokeWidth: 5
+        });
+        myMap.geoObjects.add(placemark1);
+        placemarks.push(placemark1);
+        circles.push(circle1);
+        circleVisible.push(false);
+    
+                    var bounds = myMap.geoObjects.getBounds();
+                    if (bounds) {
+                        myMap.setBounds(bounds, { checkZoomRange: true, zoomMargin: 50 }).then(function() {
+                            if (myMap.getZoom() > 10) {
+                                myMap.setZoom(10);
+                            }
+                        });
+                    }
+                }
+
+                function toggleService(service) {
+                    if (service === 'Yandex') {
+                        yandexVisible = !yandexVisible;
+                        for (var i = 0; i < placemarks.length; i++) {
+                            if (placemarks[i].options.get('preset') === 'islands#redIcon') {
+                                if (yandexVisible) {
+                                    myMap.geoObjects.add(placemarks[i]);
+                                    if (circleVisible[i]) {
+                                        myMap.geoObjects.add(circles[i]);
+                                    }
+                                } else {
+                                    myMap.geoObjects.remove(placemarks[i]);
+                                    myMap.geoObjects.remove(circles[i]);
+                                }
+                            }
+                        }
+                    } else if (service === 'Mylnikov') {
+                        mylnikovVisible = !mylnikovVisible;
+                        for (var i = 0; i < placemarks.length; i++) {
+                            if (placemarks[i].options.get('preset') === 'islands#blueIcon') {
+                                if (mylnikovVisible) {
+                                    myMap.geoObjects.add(placemarks[i]);
+                                    if (circleVisible[i]) {
+                                        myMap.geoObjects.add(circles[i]);
+                                    }
+                                } else {
+                                    myMap.geoObjects.remove(placemarks[i]);
+                                    myMap.geoObjects.remove(circles[i]);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                function searchByIMEI() {
+                    var imeiInput = document.getElementById('imeiSearch').value;
+                    for (var i = 0; i < placemarks.length; i++) {
+                        var balloonContent = placemarks[i].properties.get('balloonContent');
+                        if (balloonContent.includes('IMEI: ' + imeiInput)) {
+                            placemarks[i].options.set('preset', 'islands#yellowIcon');
+                            myMap.setCenter(placemarks[i].geometry.getCoordinates(), 15);
+                        } else {
+                            placemarks[i].options.set('preset', placemarks[i].options.get('preset').includes('red') ? 'islands#redIcon' : 'islands#blueIcon');
+                        }
+                    }
+                }
+
+                function toggleCircleVisibility(index) {
+                    if (circleVisible[index]) {
+                        myMap.geoObjects.remove(circles[index]);
+                        placemarks[index].properties.set('balloonContent', placemarks[index].properties.get('balloonContent').replace('Скрыть радиус', 'Показать радиус'));
+                    } else {
+                        myMap.geoObjects.add(circles[index]);
+                        placemarks[index].properties.set('balloonContent', placemarks[index].properties.get('balloonContent').replace('Показать радиус', 'Скрыть радиус'));
+                    }
+                    circleVisible[index] = !circleVisible[index];
+                }
+
+                function copyCoordinates(lat, lon) {
+                    var coordinates = lat.toFixed(6) + ', ' + lon.toFixed(6);
+                    navigator.clipboard.writeText(coordinates).then(function() {
+                        alert("Координаты скопированы: " + coordinates);
+                    });
+                }
+
+                function removeTower(index) {
+                    myMap.geoObjects.remove(placemarks[index]);
+                    myMap.geoObjects.remove(circles[index]);
+                    placemarks.splice(index, 1);
+                    circles.splice(index, 1);
+                    circleVisible.splice(index, 1);
+                    
+                    // Обновление CSV-файла
+                    updateCSVFile();
+                }
+
+                function updateCSVFile() {
+                    var newData = [];
+                    for (var i = 0; i < placemarks.length; i++) {
+                        var balloonContent = placemarks[i].properties.get('balloonContent');
+                        var imeiMatch = balloonContent.match(/IMEI: (\w+)/);
+                        if (imeiMatch) {
+                            newData.push({
+                                'IMEI': imeiMatch[1],
+                                'MCC': '250',
+                                'MNC': 'unknown',
+                                'LAC': 'unknown',
+                                'CELLID': 'unknown'
+                            });
+                        }
+                    }
+                    
+                    // Создание временного файла CSV для скачивания
+                    var csvContent = "IMEI,MCC,MNC,LAC,CELLID\n";
+                    newData.forEach(function(row) {
+                        csvContent += row.IMEI + "," + row.MCC + "," + row.MNC + "," + row.LAC + "," + row.CELLID + "\n";
+                    });
+                    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    var link = document.createElement("a");
+                    link.href = URL.createObjectURL(blob);
+                    link.download = "updated_towers.csv";
+                    link.click();
+                }
+            </script>
+        </body>
+        </html>
+    
