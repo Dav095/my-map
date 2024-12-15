@@ -61,6 +61,14 @@
 
       const radiusObjects = []; // Храним круги для управления их видимостью
 
+      // Проверяем тип устройства (мобильное или ПК)
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
+
+      // Отключаем scrollZoom только на мобильных
+      if (isMobile) {
+        myMap.behaviors.disable('scrollZoom');
+      }
+
       // Обрабатываем данные и создаём пины с радиусами
       data.forEach((point, index) => {
         const coords = point.coords;
@@ -107,9 +115,6 @@
         radiusObjects.push(circle);
       });
 
-      // Полноэкранный режим для мобильных
-      myMap.behaviors.disable('scrollZoom');
-
       window.toggleRadius = function(index) {
         if (radiusObjects[index]) {
           const currentVisibility = radiusObjects[index].options.get("visible");
@@ -117,7 +122,6 @@
         }
       };
 
-      // Функция для копирования координат
       window.copyToClipboard = function(text) {
         navigator.clipboard.writeText(text).then(() => {
           alert('Координаты скопированы: ' + text);
