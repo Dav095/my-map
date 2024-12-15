@@ -11,7 +11,6 @@
       font-size: 14px;
     }
     .copy-btn {
-      display: inline-block;
       margin-top: 5px;
       padding: 2px 6px;
       font-size: 12px;
@@ -30,58 +29,36 @@
     function init() {
       const urlParams = new URLSearchParams(window.location.search);
       const data = JSON.parse(urlParams.get('data'));
-      const myMap = new ymaps.Map("map", {
-        center: [55.755864, 37.617698], // Центр по умолчанию
-        zoom: 12
-      });
+      const myMap = new ymaps.Map("map", { center: [55.755864, 37.617698], zoom: 12 });
 
-      // Функция для добавления радиуса и пина
       data.forEach(point => {
-        const coords = point.coords;
-        const color = point.color;
-        const hint = point.hint;
-
-        // Создаем круг (радиус)
-        if (point.radius) {
-          const circle = new ymaps.Circle([
-            coords, point.radius
-          ], {}, {
-            fillColor: 'rgba(0, 0, 255, 0.1)',
-            strokeColor: '#0000FF',
-            strokeOpacity: 0.5,
-            strokeWidth: 2
-          });
-          myMap.geoObjects.add(circle);
-        }
-
-        // Создаем пин с баллуном
+        const circle = point.radius 
+          ? new ymaps.Circle([point.coords, point.radius], {}, { fillColor: 'rgba(0, 0, 255, 0.1)', strokeColor: '#0000FF', strokeWidth: 2 }) 
+          : null;
         const placemark = new ymaps.Placemark(
-          coords,
+          point.coords,
           {
-            hintContent: hint,
+            hintContent: point.hint,
             balloonContent: `
               <div class="balloon-content">
-                <b>Информация:</b><br>
                 Радиус: ${point.radius ? point.radius + " м" : "Не указан"}<br>
-                Координаты: ${coords[0]}, ${coords[1]}<br>
-                <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button>
+                Координаты: ${point.coords[0]}, ${point.coords[1]}<br>
+                <button class="copy-btn" onclick="copyToClipboard('${point.coords[0]}, ${point.coords[1]}')">Скопировать</button>
               </div>
             `
           },
-          { preset: color }
+          { preset: point.color }
         );
+
         myMap.geoObjects.add(placemark);
+        if (circle) myMap.geoObjects.add(circle);
       });
 
-      // Центровка карты на все точки
       myMap.setBounds(myMap.geoObjects.getBounds(), { checkZoomRange: true });
     }
 
-    // Функция для копирования координат
     function copyToClipboard(text) {
-      navigator.clipboard.writeText(text).then(() => {
-        alert('Координаты скопированы: ' + text);
-      });
+      navigator.clipboard.writeText(text).then(() => alert('Скопировано: ' + text));
     }
   </script>
 </body>
