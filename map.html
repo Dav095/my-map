@@ -11,6 +11,22 @@
       margin: 0;
       padding: 0;
     }
+    .balloon-content {
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+    }
+    .toggle-btn, .copy-btn {
+      margin-top: 5px;
+      padding: 4px 8px;
+      font-size: 12px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .toggle-btn {
+      background-color: #2196F3;
+    }
   </style>
 </head>
 <body>
@@ -19,51 +35,90 @@
     ymaps.ready(init);
 
     function init() {
+      // Получаем данные из URL
       const urlParams = new URLSearchParams(window.location.search);
       const data = JSON.parse(urlParams.get('data'));
 
-      const defaultCoords = [55.755864, 37.617698];
+      const defaultCoords = [55.755864, 37.617698]; // Москва
       let centerCoords = defaultCoords;
 
+      // Ищем координаты Яндекс для центра карты
       for (const point of data) {
         if (point.source === "Яндекс") {
           centerCoords = point.coords;
           break;
         } else if (point.coords) {
-          centerCoords = point.coords;
+          centerCoords = point.coords; // Берём первую доступную точку
         }
       }
 
+      // Создаём карту
       const myMap = new ymaps.Map("map", {
         center: centerCoords,
         zoom: 14
       });
 
-      data.forEach((point) => {
+      const radiusObjects = []; // Храним круги для управления их видимостью
+
+      // Обрабатываем данные и создаём пины с радиусами
+      data.forEach((point, index) => {
         const coords = point.coords;
         const color = point.color;
         const hint = point.source;
         const radius = point.radius;
 
-        const placemark = new ymaps.Placemark(coords, {
-          hintContent: hint,
-          balloonContent: `
-            <b>Источник:</b> ${point.source}<br>
-            Радиус: ${radius ? radius + " м" : "Не указан"}<br>
-            Координаты: ${coords[0]}, ${coords[1]}
-          `
-        }, { preset: color });
-
-        myMap.geoObjects.add(placemark);
-
+        // Создаём круг (если есть радиус)
+        let circle = null;
         if (radius) {
-          const circle = new ymaps.Circle([coords, radius], {}, {
-            fillOpacity: 0.1,
-            strokeColor: color,
-            strokeWidth: 2
-          });
+          circle = new ymaps.Circle(
+            [coords, radius],
+            {},
+            {
+              fillOpacity: 0.1,
+              strokeColor: "#0000FF",
+              strokeOpacity: 0.6,
+              strokeWidth: 2,
+              visible: false // Радиус скрыт по умолчанию
+            }
+          );
+          radiusObjects.push(circle);
           myMap.geoObjects.add(circle);
         }
+
+        // Создаём пин
+        const placemark = new ymaps.Placemark(
+          coords,
+          {
+            hintContent: hint,
+            balloonContent: `
+              <div class="balloon-content">
+                <b>Источник:</b> ${point.source}<br>
+                Радиус: ${radius ? radius + " м" : "Не указан"}<br>
+                Координаты: ${coords[0]}, ${coords[1]}<br>
+                <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
+                ${radius ? `<button class="toggle-btn" onclick="toggleRadius(${index})">Показать/Скрыть радиус</button>` : ""}
+              </div>
+            `
+          },
+          { preset: color }
+        );
+
+        myMap.geoObjects.add(placemark);
+      });
+
+      // Функция для скрытия/показа радиусов
+      window.toggleRadius = function(index) {
+        if (radiusObjects[index]) {
+          const currentVisibility = radiusObjects[index].options.get("visible");
+          radiusObjects[index].options.set("visible", !currentVisibility);
+        }
+      };
+    }
+
+    // Функция для копирования координат
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Координаты скопированы: ' + text);
       });
     }
   </script>
