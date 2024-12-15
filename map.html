@@ -11,22 +11,6 @@
       margin: 0;
       padding: 0;
     }
-    .balloon-content {
-      font-family: Arial, sans-serif;
-      font-size: 14px;
-    }
-    .toggle-btn, .copy-btn {
-      margin-top: 5px;
-      padding: 4px 8px;
-      font-size: 12px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    .toggle-btn {
-      background-color: #2196F3;
-    }
   </style>
 </head>
 <body>
@@ -35,78 +19,51 @@
     ymaps.ready(init);
 
     function init() {
-      // Получаем данные из URL
       const urlParams = new URLSearchParams(window.location.search);
       const data = JSON.parse(urlParams.get('data'));
 
-      // Создаём карту
+      const defaultCoords = [55.755864, 37.617698];
+      let centerCoords = defaultCoords;
+
+      for (const point of data) {
+        if (point.source === "Яндекс") {
+          centerCoords = point.coords;
+          break;
+        } else if (point.coords) {
+          centerCoords = point.coords;
+        }
+      }
+
       const myMap = new ymaps.Map("map", {
-        center: [55.755864, 37.617698], // Центр по умолчанию
-        zoom: 10
+        center: centerCoords,
+        zoom: 14
       });
 
-      const radiusObjects = []; // Храним круги для управления их видимостью
-
-      // Обрабатываем данные и создаём пины с радиусами
-      data.forEach((point, index) => {
+      data.forEach((point) => {
         const coords = point.coords;
         const color = point.color;
         const hint = point.source;
         const radius = point.radius;
 
-        // Создаём круг (радиус только контур), но скрываем его по умолчанию
-        let circle = null;
-        if (radius) {
-          circle = new ymaps.Circle(
-            [coords, radius],
-            {},
-            {
-              fillOpacity: 0, // Убираем заполнение
-              strokeColor: "#0000FF", // Цвет контура
-              strokeOpacity: 0.8,
-              strokeWidth: 2,
-              visible: false // Радиус скрыт по умолчанию
-            }
-          );
-          radiusObjects.push(circle);
-          myMap.geoObjects.add(circle);
-        }
-
-        // Добавляем пин
-        const placemark = new ymaps.Placemark(
-          coords,
-          {
-            hintContent: hint,
-            balloonContent: `
-              <div class="balloon-content">
-                <b>Источник:</b> ${point.source}<br>
-                Радиус: ${radius ? radius + " м" : "Не указан"}<br>
-                Координаты: ${coords[0]}, ${coords[1]}<br>
-                <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
-                ${radius ? `<button class="toggle-btn" onclick="toggleRadius(${index})">Показать/Скрыть радиус</button>` : ""}
-              </div>
-            `
-          },
-          { preset: color }
-        );
+        const placemark = new ymaps.Placemark(coords, {
+          hintContent: hint,
+          balloonContent: `
+            <b>Источник:</b> ${point.source}<br>
+            Радиус: ${radius ? radius + " м" : "Не указан"}<br>
+            Координаты: ${coords[0]}, ${coords[1]}
+          `
+        }, { preset: color });
 
         myMap.geoObjects.add(placemark);
-        radiusObjects.push(circle); // Сохраняем круг для управления
-      });
 
-      // Функция скрытия/показа радиуса
-      window.toggleRadius = function(index) {
-        if (radiusObjects[index]) {
-          const currentVisibility = radiusObjects[index].options.get("visible");
-          radiusObjects[index].options.set("visible", !currentVisibility);
+        if (radius) {
+          const circle = new ymaps.Circle([coords, radius], {}, {
+            fillOpacity: 0.1,
+            strokeColor: color,
+            strokeWidth: 2
+          });
+          myMap.geoObjects.add(circle);
         }
-      };
-    }
-
-    // Функция для копирования координат
-    function copyToClipboard(text) {
-      navigator.clipboard.writeText(text).then(() => {
-        alert('Координаты скопированы: ' + text);
       });
     }
   </script>
