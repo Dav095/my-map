@@ -11,21 +11,11 @@
       margin: 0;
       padding: 0;
     }
-    .radius-toggle {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background-color: white;
-      border: 1px solid #ccc;
-      padding: 8px;
-      z-index: 1000;
-      box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
-    }
     .balloon-content {
       font-family: Arial, sans-serif;
       font-size: 14px;
     }
-    .copy-btn {
+    .toggle-btn, .copy-btn {
       margin-top: 5px;
       padding: 4px 8px;
       font-size: 12px;
@@ -34,55 +24,55 @@
       border: none;
       cursor: pointer;
     }
+    .toggle-btn {
+      background-color: #2196F3;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <div class="radius-toggle">
-    <label>
-      <input type="checkbox" id="toggle-radius" checked> Показать радиусы
-    </label>
-  </div>
-
   <script>
     ymaps.ready(init);
 
     function init() {
+      // Получаем данные из URL
       const urlParams = new URLSearchParams(window.location.search);
       const data = JSON.parse(urlParams.get('data'));
+
+      // Создаём карту
       const myMap = new ymaps.Map("map", {
         center: [55.755864, 37.617698], // Центр по умолчанию
         zoom: 10
       });
 
-      const radiusToggle = document.getElementById("toggle-radius");
-      const geoObjects = []; // Для хранения объектов (пины и круги)
+      const radiusObjects = []; // Храним круги для управления их видимостью
 
-      // Обработка каждого пина и радиуса
-      data.forEach(point => {
+      // Обрабатываем данные и создаём пины с радиусами
+      data.forEach((point, index) => {
         const coords = point.coords;
         const color = point.color;
-        const hint = `${point.source}`;
+        const hint = point.source;
         const radius = point.radius;
 
-        // Создаём круг (только контур)
+        // Создаём круг (радиус только контур), но скрываем его по умолчанию
         let circle = null;
         if (radius) {
           circle = new ymaps.Circle(
             [coords, radius],
             {},
             {
-              fillOpacity: 0, // Убираем заполнение круга
-              strokeColor: '#0000FF', // Цвет контура
+              fillOpacity: 0, // Убираем заполнение
+              strokeColor: "#0000FF", // Цвет контура
               strokeOpacity: 0.8,
-              strokeWidth: 2
+              strokeWidth: 2,
+              visible: false // Радиус скрыт по умолчанию
             }
           );
-          geoObjects.push(circle);
+          radiusObjects.push(circle);
           myMap.geoObjects.add(circle);
         }
 
-        // Создаём пин
+        // Добавляем пин
         const placemark = new ymaps.Placemark(
           coords,
           {
@@ -92,30 +82,28 @@
                 <b>Источник:</b> ${point.source}<br>
                 Радиус: ${radius ? radius + " м" : "Не указан"}<br>
                 Координаты: ${coords[0]}, ${coords[1]}<br>
-                <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать</button>
+                <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
+                ${radius ? `<button class="toggle-btn" onclick="toggleRadius(${index})">Показать/Скрыть радиус</button>` : ""}
               </div>
             `
           },
           { preset: color }
         );
-        geoObjects.push(placemark);
+
         myMap.geoObjects.add(placemark);
+        radiusObjects.push(circle); // Сохраняем круг для управления
       });
 
-      // Обработчик для включения/выключения радиусов
-      radiusToggle.addEventListener("change", () => {
-        geoObjects.forEach(obj => {
-          if (obj instanceof ymaps.Circle) {
-            obj.options.set("visible", radiusToggle.checked);
-          }
-        });
-      });
-
-      // Центрирование карты на все объекты
-      myMap.setBounds(myMap.geoObjects.getBounds(), { checkZoomRange: true });
+      // Функция скрытия/показа радиуса
+      window.toggleRadius = function(index) {
+        if (radiusObjects[index]) {
+          const currentVisibility = radiusObjects[index].options.get("visible");
+          radiusObjects[index].options.set("visible", !currentVisibility);
+        }
+      };
     }
 
-    // Функция копирования координат
+    // Функция для копирования координат
     function copyToClipboard(text) {
       navigator.clipboard.writeText(text).then(() => {
         alert('Координаты скопированы: ' + text);
