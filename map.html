@@ -50,26 +50,28 @@
     function init() {
       // Получаем данные из URL
       const urlParams = new URLSearchParams(window.location.search);
-      const data = JSON.parse(urlParams.get('data'));
+      const data = JSON.parse(urlParams.get('data')) || [];
+
+      // Центр карты на первой вышке или резервные координаты
+      const defaultCenter = [55.755864, 37.617698]; // Резервный центр
+      const firstPoint = data.length > 0 ? data[0].coords : defaultCenter;
 
       // Создаём карту
       const myMap = new ymaps.Map("map", {
-        center: [55.755864, 37.617698], // Центр по умолчанию
-        zoom: 10,
-        controls: ['zoomControl', 'fullscreenControl'] // Улучшаем управление на мобильных
+        center: firstPoint, // Центр на первой вышке
+        zoom: 12,
+        controls: ['zoomControl', 'fullscreenControl']
       });
 
       const radiusObjects = []; // Храним круги для управления их видимостью
 
-      // Проверяем тип устройства (мобильное или ПК)
+      // Проверка устройства для отключения скролла на мобильных
       const isMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
-
-      // Отключаем scrollZoom только на мобильных
       if (isMobile) {
-        myMap.behaviors.disable('scrollZoom');
+        myMap.behaviors.disable('scrollZoom'); // Отключаем зум на мобильных
       }
 
-      // Обрабатываем данные и создаём пины с радиусами
+      // Обрабатываем данные и добавляем маркеры с радиусами
       data.forEach((point, index) => {
         const coords = point.coords;
         const color = point.color;
@@ -93,7 +95,7 @@
           myMap.geoObjects.add(circle);
         }
 
-        // Добавляем пин
+        // Добавляем маркер (пин)
         const placemark = new ymaps.Placemark(
           coords,
           {
@@ -115,6 +117,7 @@
         radiusObjects.push(circle);
       });
 
+      // Функция для переключения видимости радиуса
       window.toggleRadius = function(index) {
         if (radiusObjects[index]) {
           const currentVisibility = radiusObjects[index].options.get("visible");
@@ -122,6 +125,7 @@
         }
       };
 
+      // Функция для копирования координат
       window.copyToClipboard = function(text) {
         navigator.clipboard.writeText(text).then(() => {
           alert('Координаты скопированы: ' + text);
