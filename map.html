@@ -6,6 +6,20 @@
   <script src="https://api-maps.yandex.ru/2.1/?apikey=2a74af8c-a82e-4f60-ad7a-34085c8248c3&lang=ru_RU" type="text/javascript"></script>
   <style>
     html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; }
+    .balloon-content {
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+    }
+    .copy-btn {
+      display: inline-block;
+      margin-top: 5px;
+      padding: 2px 6px;
+      font-size: 12px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -14,28 +28,60 @@
     ymaps.ready(init);
 
     function init() {
-      // Получаем параметры из URL
       const urlParams = new URLSearchParams(window.location.search);
       const data = JSON.parse(urlParams.get('data'));
-
-      // Создаем карту
       const myMap = new ymaps.Map("map", {
-        center: [55.755864, 37.617698], // Центр по умолчанию (Москва)
+        center: [55.755864, 37.617698], // Центр по умолчанию
         zoom: 12
       });
 
-      // Добавляем пины
+      // Функция для добавления радиуса и пина
       data.forEach(point => {
+        const coords = point.coords;
+        const color = point.color;
+        const hint = point.hint;
+
+        // Создаем круг (радиус)
+        if (point.radius) {
+          const circle = new ymaps.Circle([
+            coords, point.radius
+          ], {}, {
+            fillColor: 'rgba(0, 0, 255, 0.1)',
+            strokeColor: '#0000FF',
+            strokeOpacity: 0.5,
+            strokeWidth: 2
+          });
+          myMap.geoObjects.add(circle);
+        }
+
+        // Создаем пин с баллуном
         const placemark = new ymaps.Placemark(
-          point.coords,
-          { hintContent: point.hint },
-          { preset: point.color }
+          coords,
+          {
+            hintContent: hint,
+            balloonContent: `
+              <div class="balloon-content">
+                <b>Информация:</b><br>
+                Радиус: ${point.radius ? point.radius + " м" : "Не указан"}<br>
+                Координаты: ${coords[0]}, ${coords[1]}<br>
+                <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button>
+              </div>
+            `
+          },
+          { preset: color }
         );
         myMap.geoObjects.add(placemark);
       });
 
-      // Центровка карты на все пины
+      // Центровка карты на все точки
       myMap.setBounds(myMap.geoObjects.getBounds(), { checkZoomRange: true });
+    }
+
+    // Функция для копирования координат
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Координаты скопированы: ' + text);
+      });
     }
   </script>
 </body>
