@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <title>Карта вышек</title></title>
+  <title>Интерактивная карта с радиусами</title>
   <script src="https://api-maps.yandex.ru/2.1/?apikey=e8e414ff-9300-4b94-bbd3-f13cc7b1f51d&lang=ru_RU" type="text/javascript"></script>
   <style>
     /* Общее для всех устройств */
@@ -114,14 +114,16 @@
         );
 
         myMap.geoObjects.add(placemark);
-        radiusObjects.push(circle);
       });
 
       // Функция для переключения видимости радиуса
       window.toggleRadius = function(index) {
-        if (radiusObjects[index]) {
-          const currentVisibility = radiusObjects[index].options.get("visible");
-          radiusObjects[index].options.set("visible", !currentVisibility);
+        const circle = radiusObjects[index];
+        if (circle) {
+          const currentVisibility = circle.options.get("visible");
+          circle.options.set("visible", !currentVisibility);
+        } else {
+          console.warn(`Радиус с индексом ${index} не найден.`);
         }
       };
 
