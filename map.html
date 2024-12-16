@@ -111,14 +111,15 @@
         );
 
         // Привязываем радиус к маркеру
-        placemark.properties.set('circle', circle);
+        if (circle) placemark.properties.set('circle', circle);
+        placemark.properties.set('id', index);
         myMap.geoObjects.add(placemark);
       });
 
       // Функция для переключения видимости радиуса
       window.toggleRadius = function(index) {
         const geoObjects = myMap.geoObjects.toArray();
-        const placemark = geoObjects[index];
+        const placemark = geoObjects.find(obj => obj.properties.get('id') == index);
         if (placemark) {
           const circle = placemark.properties.get('circle');
           if (circle) {
