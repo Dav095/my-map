@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <title>Интерактивная карта с радиусами</title>
+  <title>Карта вышек</title>
   <script src="https://api-maps.yandex.ru/2.1/?apikey=e8e414ff-9300-4b94-bbd3-f13cc7b1f51d&lang=ru_RU" type="text/javascript"></script>
   <style>
     /* Общее для всех устройств */
@@ -39,6 +39,20 @@
         padding: 3px 6px;
         font-size: 10px;
       }
+    }
+
+    /* Стиль временного уведомления */
+    .temporary-message {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #333;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 5px;
+      z-index: 1000;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -128,11 +142,24 @@
       // Функция для копирования координат
       window.copyToClipboard = function(text) {
         navigator.clipboard.writeText(text).then(() => {
-          alert('Координаты скопированы: ' + text);
+          showTemporaryMessage('Координаты скопированы: ' + text);
         }).catch(() => {
-          alert('Ошибка при копировании координат.');
+          showTemporaryMessage('Ошибка при копировании координат.');
         });
       };
+
+      // Функция для отображения временного сообщения
+      function showTemporaryMessage(message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.textContent = message;
+        messageDiv.className = 'temporary-message';
+        document.body.appendChild(messageDiv);
+
+        // Удаляем сообщение через 0.5 секунды
+        setTimeout(() => {
+          document.body.removeChild(messageDiv);
+        }, 500);
+      }
     }
   </script>
 </body>
