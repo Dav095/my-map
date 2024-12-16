@@ -63,6 +63,8 @@
         controls: ['zoomControl', 'fullscreenControl']
       });
 
+      const radiusObjects = []; // Храним круги для управления их видимостью
+
       // Проверка устройства для отключения скролла на мобильных
       const isMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
       if (isMobile) {
@@ -89,6 +91,7 @@
               visible: false
             }
           );
+          radiusObjects.push(circle);
           myMap.geoObjects.add(circle);
         }
 
@@ -103,29 +106,22 @@
                 Радиус: ${radius ? radius + " м" : "Не указан"}<br>
                 Координаты: ${coords[0]}, ${coords[1]}<br>
                 <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
-                ${radius ? `<button class="toggle-btn" onclick="toggleRadius('${index}')">Показать/Скрыть радиус</button>` : ""}
+                ${radius ? `<button class="toggle-btn" onclick="toggleRadius(${index})">Показать/Скрыть радиус</button>` : ""}
               </div>
             `
           },
           { preset: color }
         );
 
-        // Привязываем радиус к маркеру
-        if (circle) placemark.properties.set('circle', circle);
-        placemark.properties.set('id', index);
         myMap.geoObjects.add(placemark);
+        radiusObjects.push(circle);
       });
 
       // Функция для переключения видимости радиуса
       window.toggleRadius = function(index) {
-        const geoObjects = myMap.geoObjects.toArray();
-        const placemark = geoObjects.find(obj => obj.properties.get('id') == index);
-        if (placemark) {
-          const circle = placemark.properties.get('circle');
-          if (circle) {
-            const currentVisibility = circle.options.get("visible");
-            circle.options.set("visible", !currentVisibility);
-          }
+        if (radiusObjects[index]) {
+          const currentVisibility = radiusObjects[index].options.get("visible");
+          radiusObjects[index].options.set("visible", !currentVisibility);
         }
       };
 
