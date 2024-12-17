@@ -6,7 +6,6 @@
   <title>Карта вышек</title>
   <script src="https://api-maps.yandex.ru/2.1/?apikey=e8e414ff-9300-4b94-bbd3-f13cc7b1f51d&lang=ru_RU" type="text/javascript"></script>
   <style>
-    /* Общее для всех устройств */
     html, body, #map {
       width: 100%;
       height: 100%;
@@ -29,8 +28,6 @@
     .toggle-btn {
       background-color: #2196F3;
     }
-
-    /* Медиа-запрос для мобильных устройств */
     @media (max-width: 768px) {
       .balloon-content {
         font-size: 12px;
@@ -40,8 +37,6 @@
         font-size: 10px;
       }
     }
-
-    /* Стиль временного уведомления */
     .temporary-message {
       position: fixed;
       bottom: 10px;
@@ -66,31 +61,60 @@
       const urlParams = new URLSearchParams(window.location.search);
       const data = JSON.parse(urlParams.get('data')) || [];
 
-      // Центр карты на первой вышке или резервные координаты
       const defaultCenter = [55.755864, 37.617698]; // Резервный центр
       const firstPoint = data.length > 0 ? data[0].coords : defaultCenter;
 
-      // Создаём карту
       const myMap = new ymaps.Map("map", {
-        center: firstPoint, // Центр на первой вышке
+        center: firstPoint,
         zoom: 12,
         controls: ['zoomControl', 'fullscreenControl']
       });
 
-      const radiusObjects = []; // Храним круги для управления их видимостью
-
-      // Проверка устройства для отключения скролла на мобильных
+      const radiusObjects = [];
       const isMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
       if (isMobile) {
-        myMap.behaviors.disable('scrollZoom'); // Отключаем зум на мобильных
+        myMap.behaviors.disable('scrollZoom');
       }
 
-      // Обрабатываем данные и добавляем маркеры с радиусами
+      // Структура для группировки по IMEI
+      // Формат:
+      // imeiGroups = {
+      //   "123456789012345": {
+      //      towers: [{coords: [...]}],
+      //      blocks: [{coords: [...]}]
+      //   },
+      //   ...
+      // }
+      const imeiGroups = {};
+
       data.forEach((point, index) => {
         const coords = point.coords;
-        const color = point.color;
-        const hint = point.source;
         const radius = point.radius;
+        const sourceStr = point.source; 
+        // Извлекаем тип и IMEI из sourceStr
+        // Формат: "<Источник> (IMEI:<номер>)"
+        // Пример: "Яндекс (IMEI:866050031197146)"
+        // Найдём IMEI с помощью регулярного выражения
+        let imeiMatch = sourceStr.match(/IMEI:([\d]+)/);
+        let imei = imeiMatch ? imeiMatch[1] : null;
+
+        // Определим тип точки: вышка или блок
+        // Если sourceStr содержит "Блок", считаем её блоком
+        // Если содержит "Яндекс" или "Кэш" - вышкой
+        let isBlock = sourceStr.includes("Блок");
+        let isTower = (sourceStr.includes("Яндекс") || sourceStr.includes("Кэш"));
+
+        // Записываем точки в группы по IMEI
+        if (imei) {
+          if (!imeiGroups[imei]) {
+            imeiGroups[imei] = { towers: [], blocks: [] };
+          }
+          if (isTower) {
+            imeiGroups[imei].towers.push({ coords });
+          } else if (isBlock) {
+            imeiGroups[imei].blocks.push({ coords });
+          }
+        }
 
         let circle = null;
         if (radius) {
@@ -109,11 +133,10 @@
           myMap.geoObjects.add(circle);
         }
 
-        // Добавляем маркер (пин)
         const placemark = new ymaps.Placemark(
           coords,
           {
-            hintContent: hint,
+            hintContent: sourceStr,
             balloonContent: `
               <div class="balloon-content">
                 <b>Источник:</b> ${point.source}<br>
@@ -124,14 +147,13 @@
               </div>
             `
           },
-          { preset: color }
+          { preset: point.color }
         );
 
         myMap.geoObjects.add(placemark);
         radiusObjects.push(circle);
       });
 
-      // Функция для переключения видимости радиуса
       window.toggleRadius = function(index) {
         if (radiusObjects[index]) {
           const currentVisibility = radiusObjects[index].options.get("visible");
@@ -139,7 +161,6 @@
         }
       };
 
-      // Функция для копирования координат
       window.copyToClipboard = function(text) {
         navigator.clipboard.writeText(text).then(() => {
           showTemporaryMessage('Координаты скопированы: ' + text);
@@ -148,17 +169,33 @@
         });
       };
 
-      // Функция для отображения временного сообщения
       function showTemporaryMessage(message) {
         const messageDiv = document.createElement('div');
         messageDiv.textContent = message;
         messageDiv.className = 'temporary-message';
         document.body.appendChild(messageDiv);
-
-        // Удаляем сообщение через 0.5 секунды
         setTimeout(() => {
           document.body.removeChild(messageDiv);
         }, 500);
+      }
+
+      // Теперь, когда все точки добавлены, попробуем связать блоки и вышки линиями
+      // Для каждого IMEI: если есть хотя бы одна вышка и хотя бы один блок,
+      // проведём линию от вышки к блоку.
+      for (const imei in imeiGroups) {
+        const group = imeiGroups[imei];
+        if (group.towers.length > 0 && group.blocks.length > 0) {
+          // Предположим, используем первую вышку в группе как основную
+          const tower = group.towers[0];
+          for (const block of group.blocks) {
+            const line = new ymaps.Polyline([tower.coords, block.coords], {}, {
+              strokeColor: "#FF0000",
+              strokeWidth: 2,
+              strokeOpacity: 0.7
+            });
+            myMap.geoObjects.add(line);
+          }
+        }
       }
     }
   </script>
