@@ -49,19 +49,75 @@
       z-index: 1000;
       font-size: 14px;
     }
+
+    /* Панель управления */
+    .control-panel {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 999;
+      font-size: 14px;
+      font-family: Arial, sans-serif;
+    }
+
+    .control-panel label {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .control-panel input[type="text"] {
+      width: 100px;
+      margin-right: 5px;
+    }
+
+    .control-panel button {
+      padding: 3px 6px;
+      font-size: 12px;
+      background-color: #2196F3;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+
+    @media (max-width: 768px) {
+      .control-panel {
+        font-size: 12px;
+      }
+      .control-panel input[type="text"] {
+        width: 80px;
+      }
+      .control-panel button {
+        font-size: 10px;
+      }
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div class="control-panel">
+    <label><input type="checkbox" id="showTowers" checked> Показать вышки</label>
+    <label><input type="checkbox" id="showBlocks" checked> Показать блоки</label>
+    <div style="margin-top:5px;">
+      <input type="text" id="imeiSearch" placeholder="IMEI">
+      <button id="searchBtn">Поиск</button>
+    </div>
+  </div>
   <script>
     ymaps.ready(init);
+
+    let placemarks = []; // { placemark, imei, type: 'tower'|'block' }
+    let lines = [];     // { line, imei }
 
     function init() {
       // Получаем данные из URL
       const urlParams = new URLSearchParams(window.location.search);
       const data = JSON.parse(urlParams.get('data')) || [];
 
-      const defaultCenter = [55.755864, 37.617698]; // Резервный центр
+      const defaultCenter = [55.755864, 37.617698]; 
       const firstPoint = data.length > 0 ? data[0].coords : defaultCenter;
 
       const myMap = new ymaps.Map("map", {
@@ -76,35 +132,18 @@
         myMap.behaviors.disable('scrollZoom');
       }
 
-      // Структура для группировки по IMEI
-      // Формат:
-      // imeiGroups = {
-      //   "123456789012345": {
-      //      towers: [{coords: [...]}],
-      //      blocks: [{coords: [...]}]
-      //   },
-      //   ...
-      // }
       const imeiGroups = {};
 
       data.forEach((point, index) => {
         const coords = point.coords;
         const radius = point.radius;
         const sourceStr = point.source; 
-        // Извлекаем тип и IMEI из sourceStr
-        // Формат: "<Источник> (IMEI:<номер>)"
-        // Пример: "Яндекс (IMEI:866050031197146)"
-        // Найдём IMEI с помощью регулярного выражения
         let imeiMatch = sourceStr.match(/IMEI:([\d]+)/);
         let imei = imeiMatch ? imeiMatch[1] : null;
 
-        // Определим тип точки: вышка или блок
-        // Если sourceStr содержит "Блок", считаем её блоком
-        // Если содержит "Яндекс" или "Кэш" - вышкой
         let isBlock = sourceStr.includes("Блок");
         let isTower = (sourceStr.includes("Яндекс") || sourceStr.includes("Кэш"));
 
-        // Записываем точки в группы по IMEI
         if (imei) {
           if (!imeiGroups[imei]) {
             imeiGroups[imei] = { towers: [], blocks: [] };
@@ -133,6 +172,9 @@
           myMap.geoObjects.add(circle);
         }
 
+        // Выбираем иконку в зависимости от того, вышка это или блок
+        let iconPreset = isTower ? 'islands#redCircleIcon' : 'islands#blueCircleIcon';
+
         const placemark = new ymaps.Placemark(
           coords,
           {
@@ -147,12 +189,36 @@
               </div>
             `
           },
-          { preset: point.color }
+          { preset: iconPreset }
         );
 
         myMap.geoObjects.add(placemark);
         radiusObjects.push(circle);
+
+        placemarks.push({
+          placemark,
+          imei,
+          type: isTower ? 'tower' : (isBlock ? 'block' : 'other')
+        });
       });
+
+      // Рисуем линии между вышками и блоками
+      // Исп. первую вышку в группе как основную
+      for (const imei in imeiGroups) {
+        const group = imeiGroups[imei];
+        if (group.towers.length > 0 && group.blocks.length > 0) {
+          const tower = group.towers[0];
+          for (const block of group.blocks) {
+            const line = new ymaps.Polyline([tower.coords, block.coords], {}, {
+              strokeColor: "#FF0000",
+              strokeWidth: 2,
+              strokeOpacity: 0.7
+            });
+            myMap.geoObjects.add(line);
+            lines.push({ line, imei });
+          }
+        }
+      }
 
       window.toggleRadius = function(index) {
         if (radiusObjects[index]) {
@@ -179,24 +245,55 @@
         }, 500);
       }
 
-      // Теперь, когда все точки добавлены, попробуем связать блоки и вышки линиями
-      // Для каждого IMEI: если есть хотя бы одна вышка и хотя бы один блок,
-      // проведём линию от вышки к блоку.
-      for (const imei in imeiGroups) {
-        const group = imeiGroups[imei];
-        if (group.towers.length > 0 && group.blocks.length > 0) {
-          // Предположим, используем первую вышку в группе как основную
-          const tower = group.towers[0];
-          for (const block of group.blocks) {
-            const line = new ymaps.Polyline([tower.coords, block.coords], {}, {
-              strokeColor: "#FF0000",
-              strokeWidth: 2,
-              strokeOpacity: 0.7
-            });
-            myMap.geoObjects.add(line);
-          }
-        }
+      // Фильтрация видимости
+      const showTowers = document.getElementById('showTowers');
+      const showBlocks = document.getElementById('showBlocks');
+      const imeiSearch = document.getElementById('imeiSearch');
+      const searchBtn = document.getElementById('searchBtn');
+
+      function updateVisibility() {
+        const towersVisible = showTowers.checked;
+        const blocksVisible = showBlocks.checked;
+
+        // Обновляем видимость пинов
+        placemarks.forEach(p => {
+          let visible = true;
+          if (p.type === 'tower' && !towersVisible) visible = false;
+          if (p.type === 'block' && !blocksVisible) visible = false;
+          p.placemark.options.set('visible', visible);
+        });
+
+        // Обновляем видимость линий
+        // Линия имеет смысл, только если видны и towers, и blocks
+        const linesVisible = towersVisible && blocksVisible;
+        lines.forEach(l => {
+          l.line.options.set('visible', linesVisible);
+        });
       }
+
+      showTowers.addEventListener('change', updateVisibility);
+      showBlocks.addEventListener('change', updateVisibility);
+
+      // Поиск по IMEI
+      searchBtn.addEventListener('click', () => {
+        const searchImei = imeiSearch.value.trim();
+        if (!searchImei) return;
+        // Находим все точки с этим IMEI
+        const found = placemarks.filter(p => p.imei === searchImei);
+        if (found.length > 0) {
+          // Определяем границы
+          const coordsArray = found.map(f => f.placemark.geometry.getCoordinates());
+          const bounds = ymaps.util.bounds.fromPoints(coordsArray);
+          myMap.setBounds(bounds, { checkZoomRange: true }).then(() => {
+            let zoom = myMap.getZoom();
+            if (zoom > 15) myMap.setZoom(15); // Не слишком близко
+          });
+        } else {
+          showTemporaryMessage(`IMEI: ${searchImei} не найден!`);
+        }
+      });
+
+      updateVisibility(); // Первоначальная установка видимости
     }
   </script>
 </body>
