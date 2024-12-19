@@ -16,7 +16,7 @@
       font-family: Arial, sans-serif;
       font-size: 14px;
     }
-    .toggle-btn, .copy-btn {
+    .toggle-btn, .copy-btn, .route-btn {
       margin-top: 5px;
       padding: 4px 8px;
       font-size: 12px;
@@ -24,15 +24,19 @@
       color: white;
       border: none;
       cursor: pointer;
+      border-radius: 3px;
     }
     .toggle-btn {
       background-color: #2196F3;
+    }
+    .route-btn {
+      background-color: #FF5722;
     }
     @media (max-width: 768px) {
       .balloon-content {
         font-size: 12px;
       }
-      .toggle-btn, .copy-btn {
+      .toggle-btn, .copy-btn, .route-btn {
         padding: 3px 6px;
         font-size: 10px;
       }
@@ -115,7 +119,7 @@
     function init() {
       // Получаем данные из URL
       const urlParams = new URLSearchParams(window.location.search);
-      const data = JSON.parse(urlParams.get('data')) || [];
+      const data = JSON.parse(decodeURIComponent(urlParams.get('data'))) || [];
 
       const defaultCenter = [55.755864, 37.617698]; 
       const firstPoint = data.length > 0 ? data[0].coords : defaultCenter;
@@ -138,8 +142,14 @@
         const coords = point.coords;
         const radius = point.radius;
         const sourceStr = point.source; 
-        let imeiMatch = sourceStr.match(/IMEI:([\d]+)/);
-        let imei = imeiMatch ? imeiMatch[1] : null;
+        const type = point.type || 'regular'; // Тип пина: 'single' или 'regular'
+
+        let imei = null;
+        if (type === 'regular') {
+          // Попытка извлечь IMEI из sourceStr, если нужно
+          let imeiMatch = sourceStr.match(/IMEI:([\d]+)/);
+          imei = imeiMatch ? imeiMatch[1] : null;
+        }
 
         let isBlock = sourceStr.includes("Блок");
         let isTower = (sourceStr.includes("Яндекс") || sourceStr.includes("Кэш"));
@@ -175,25 +185,40 @@
         // Выбираем иконку в зависимости от того, вышка это или блок
         let iconPreset = isTower ? 'islands#redCircleIcon' : 'islands#blueCircleIcon';
 
+        // Формируем содержимое балуна в зависимости от типа пина
+        let balloonContent = `
+          <div class="balloon-content">
+            <b>Источник:</b> ${sourceStr}<br>
+            Радиус: ${radius ? radius + " м" : "Не указан"}<br>
+            Координаты: ${coords[0]}, ${coords[1]}<br>
+            <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
+        `;
+
+        if (type === 'single') {
+          balloonContent += `
+            <button class="route-btn" onclick="buildRoute(${coords[0]}, ${coords[1]})">Построить маршрут</button><br>
+          `;
+        }
+
+        if (radius) {
+          balloonContent += `<button class="toggle-btn" onclick="toggleRadius(${index})">Показать/Скрыть радиус</button>`;
+        }
+
+        balloonContent += `</div>`;
+
         const placemark = new ymaps.Placemark(
           coords,
           {
             hintContent: sourceStr,
-            balloonContent: `
-              <div class="balloon-content">
-                <b>Источник:</b> ${point.source}<br>
-                Радиус: ${radius ? radius + " м" : "Не указан"}<br>
-                Координаты: ${coords[0]}, ${coords[1]}<br>
-                <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
-                ${radius ? `<button class="toggle-btn" onclick="toggleRadius(${index})">Показать/Скрыть радиус</button>` : ""}
-              </div>
-            `
+            balloonContent: balloonContent
           },
           { preset: iconPreset }
         );
 
         myMap.geoObjects.add(placemark);
-        radiusObjects.push(circle);
+        if (circle) {
+          myMap.geoObjects.add(circle);
+        }
 
         placemarks.push({
           placemark,
@@ -203,7 +228,7 @@
       });
 
       // Рисуем линии между вышками и блоками
-      // Исп. первую вышку в группе как основную
+      // Используем первую вышку в группе как основную
       for (const imei in imeiGroups) {
         const group = imeiGroups[imei];
         if (group.towers.length > 0 && group.blocks.length > 0) {
@@ -235,6 +260,16 @@
         });
       };
 
+      window.buildRoute = function(lat, lon) {
+        if (/Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent)) {
+          // Мобильное устройство: открыть Яндекс.Навигатор
+          window.open(`yandexnavi://build_route_on_map?lat_to=${lat}&lon_to=${lon}`, '_blank');
+        } else {
+          // ПК: открыть Яндекс.Карты, центрировать на точке с приближением
+          window.open(`https://yandex.ru/maps/?ll=${lon},${lat}&z=16&mode=routes`, '_blank');
+        }
+      };
+
       function showTemporaryMessage(message) {
         const messageDiv = document.createElement('div');
         messageDiv.textContent = message;
@@ -242,7 +277,7 @@
         document.body.appendChild(messageDiv);
         setTimeout(() => {
           document.body.removeChild(messageDiv);
-        }, 500);
+        }, 3000); // Увеличил время отображения до 3 секунд для лучшей видимости
       }
 
       // Фильтрация видимости
