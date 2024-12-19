@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>Карта вышек</title>
-  <script src="https://api-maps.yandex.ru/2.1/?apikey=2a74af8c-a82e-4f60-ad7a-34085c8248c3&lang=ru_RU" type="text/javascript"></script>
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=YOUR_YANDEX_API_KEY&lang=ru_RU" type="text/javascript"></script>
   <style>
     html, body, #map {
       width: 100%;
@@ -113,7 +113,7 @@
   <script>
     ymaps.ready(init);
 
-    let placemarks = []; // { placemark, imei, type: 'tower'|'block' }
+    let placemarks = []; // { placemark, imei, type: 'tower'|'block'|'single' }
     let lines = [];     // { line, imei }
 
     function init() {
@@ -184,11 +184,15 @@
 
         // Выбираем иконку в зависимости от того, вышка это или блок
         let iconPreset = isTower ? 'islands#redCircleIcon' : 'islands#blueCircleIcon';
+        if (type === 'single') {
+          iconPreset = 'islands#orangeCircleIcon'; // Отличаем одиночные вышки другим цветом
+        }
 
         // Формируем содержимое балуна в зависимости от типа пина
         let balloonContent = `
           <div class="balloon-content">
             <b>Источник:</b> ${sourceStr}<br>
+            ${type !== 'single' ? `<b>Видимых спутников:</b> ${point.gpsInView}<br>` : ''}
             Радиус: ${radius ? radius + " м" : "Не указан"}<br>
             Координаты: ${coords[0]}, ${coords[1]}<br>
             <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
@@ -223,7 +227,7 @@
         placemarks.push({
           placemark,
           imei,
-          type: isTower ? 'tower' : (isBlock ? 'block' : 'other')
+          type: type // 'single' или 'regular'
         });
       });
 
@@ -295,6 +299,7 @@
           let visible = true;
           if (p.type === 'tower' && !towersVisible) visible = false;
           if (p.type === 'block' && !blocksVisible) visible = false;
+          if (p.type === 'single' && !towersVisible) visible = false; // Одиночные вышки считаем как вышки
           p.placemark.options.set('visible', visible);
         });
 
