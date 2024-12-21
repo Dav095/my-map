@@ -118,12 +118,14 @@
     </div>
     <hr>
     <h4>Добавить свои координаты</h4>
-    <form onsubmit="submitCoordinates(); return false;">
+    <form id="userCoordsForm">
       <input type="text" id="userCoords" name="userCoords" placeholder="Широта, Долгота" required>
       <button type="submit">Добавить точку</button>
     </form>
   </div>
   <script>
+    let myMap; // Объявляем глобальную переменную для карты
+
     ymaps.ready(init);
 
     let placemarks = []; // { placemark, imei, type: 'tower'|'block'|'single' }
@@ -140,13 +142,14 @@
           towerData = JSON.parse(decodeURIComponent(dataParam));
         } catch (e) {
           console.error("Ошибка при парсинге данных:", e);
+          showTemporaryMessage('Ошибка при загрузке данных карты.');
         }
       }
 
       const defaultCenter = [55.755864, 37.617698]; 
       const firstPoint = towerData.length > 0 ? towerData[0].coords : defaultCenter;
 
-      const myMap = new ymaps.Map("map", {
+      myMap = new ymaps.Map("map", {
         center: firstPoint,
         zoom: 12,
         controls: ['zoomControl', 'fullscreenControl']
@@ -358,14 +361,14 @@
       updateVisibility(); // Первоначальная установка видимости
 
       // Обработка добавления пользовательских координат
-      const userForm = document.querySelector('.control-panel form');
+      const userForm = document.getElementById('userCoordsForm');
       userForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        submitCoordinates(myMap);
+        submitCoordinates();
       });
     }
 
-    function submitCoordinates(map) {
+    function submitCoordinates() {
       const coordsInput = document.getElementById('userCoords');
       const input = coordsInput.value.trim();
 
@@ -390,7 +393,7 @@
         draggable: true
       });
 
-      map.geoObjects.add(userPlacemark);
+      myMap.geoObjects.add(userPlacemark);
       userPlacemarks.push({ placemark: userPlacemark, linkedTower: null });
 
       // Автоматическое связывание с ближайшей вышкой
@@ -414,7 +417,7 @@
           strokeWidth: 2,
           strokeOpacity: 0.7
         });
-        map.geoObjects.add(line);
+        myMap.geoObjects.add(line);
         lines.push({ line, imei: nearestTower.imei });
 
         // Вычисление расстояния
