@@ -109,16 +109,23 @@
     let userPlacemarks = [];
 
     function init() {
-      const towerData = [
-        { coords: [55.7558, 37.6173], source: 'Яндекс', gpsInView: 14, radius: 100 },
-        { coords: [60.0225, 30.3017], source: 'Кэш', gpsInView: 20, radius: 200 }
-      ];
+      const urlParams = new URLSearchParams(window.location.search);
+      const userCoordsParam = urlParams.get('coords'); // получаем координаты из URL, если они есть
 
-      const defaultCenter = [55.755864, 37.617698];
-      const firstPoint = towerData.length > 0 ? towerData[0].coords : defaultCenter;
+      let mapCenter = [55.755864, 37.617698]; // центр Москвы по умолчанию
+      if (userCoordsParam) {
+        const coords = userCoordsParam.split(',');
+        if (coords.length === 2) {
+          const lat = parseFloat(coords[0].trim());
+          const lon = parseFloat(coords[1].trim());
+          if (!isNaN(lat) && !isNaN(lon)) {
+            mapCenter = [lat, lon];
+          }
+        }
+      }
 
       const myMap = new ymaps.Map("map", {
-        center: firstPoint,
+        center: mapCenter,
         zoom: 12,
         controls: ['zoomControl', 'fullscreenControl']
       });
@@ -128,6 +135,11 @@
       if (isMobile) {
         myMap.behaviors.disable('scrollZoom');
       }
+
+      const towerData = [
+        { coords: [55.7558, 37.6173], source: 'Яндекс', gpsInView: 14, radius: 100 },
+        { coords: [60.0225, 30.3017], source: 'Кэш', gpsInView: 20, radius: 200 }
+      ];
 
       towerData.forEach((point, index) => {
         const coords = point.coords;
