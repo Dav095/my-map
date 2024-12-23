@@ -65,11 +65,7 @@
       z-index: 999;
       font-size: 14px;
       font-family: Arial, sans-serif;
-    }
-
-    .control-panel label {
-      display: block;
-      margin-bottom: 5px;
+      max-width: 200px;
     }
 
     .control-panel input[type="text"] {
@@ -90,80 +86,70 @@
       border-radius: 3px;
       margin-bottom: 5px;
     }
+
+    @media (max-width: 768px) {
+      .control-panel {
+        font-size: 12px;
+        max-width: 150px;
+      }
+      .control-panel input[type="text"] {
+        padding: 3px;
+      }
+      .control-panel button {
+        padding: 3px;
+        font-size: 10px;
+      }
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <div class="control-panel">
     <h4>Добавить свои координаты</h4>
-    <form onsubmit="submitCoordinates(); return false;">
-      <input type="text" id="userCoords" name="userCoords" placeholder="Широта, Долгота (например, 55.7558, 37.6173)" required>
+    <form id="userCoordsForm">
+      <input type="text" id="userCoords" name="userCoords" placeholder="Широта, Долгота" required>
       <button type="submit">Добавить точку</button>
     </form>
   </div>
   <script>
+    let myMap; // Глобальная переменная для карты
     ymaps.ready(init);
 
-    let placemarks = [];
-    let lines = [];
-    let userPlacemarks = [];
+    let placemarks = []; // Содержит данные о метках
+    let lines = []; // Содержит данные о линиях
+    let userPlacemarks = []; // Содержит данные о пользовательских метках
 
     function init() {
       const urlParams = new URLSearchParams(window.location.search);
-      const userCoordsParam = urlParams.get('coords'); // получаем координаты из URL, если они есть
-
-      let mapCenter = [55.755864, 37.617698]; // центр Москвы по умолчанию
-      if (userCoordsParam) {
-        const coords = userCoordsParam.split(',');
-        if (coords.length === 2) {
-          const lat = parseFloat(coords[0].trim());
-          const lon = parseFloat(coords[1].trim());
-          if (!isNaN(lat) && !isNaN(lon)) {
-            mapCenter = [lat, lon];
-          }
+      const dataParam = urlParams.get('data');
+      let towerData = [];
+      if (dataParam) {
+        try {
+          towerData = JSON.parse(decodeURIComponent(dataParam));
+        } catch (e) {
+          console.error("Ошибка при парсинге данных:", e);
         }
       }
 
-      const myMap = new ymaps.Map("map", {
-        center: mapCenter,
+      const defaultCenter = [55.755864, 37.617698]; 
+      const firstPoint = towerData.length > 0 ? towerData[0].coords : defaultCenter;
+
+      myMap = new ymaps.Map("map", {
+        center: firstPoint,
         zoom: 12,
         controls: ['zoomControl', 'fullscreenControl']
       });
-
-      const radiusObjects = [];
-      const isMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
-      if (isMobile) {
-        myMap.behaviors.disable('scrollZoom');
-      }
-
-      const towerData = [
-        { coords: [55.7558, 37.6173], source: 'Яндекс', gpsInView: 14, radius: 100 },
-        { coords: [60.0225, 30.3017], source: 'Кэш', gpsInView: 20, radius: 200 }
-      ];
 
       towerData.forEach((point, index) => {
         const coords = point.coords;
         const radius = point.radius;
         const sourceStr = point.source;
 
-        let iconPreset = 'islands#redCircleIcon';
+        let isTower = sourceStr.includes("Яндекс") || sourceStr.includes("Кэш");
 
-        let balloonContent = `
-          <div class="balloon-content">
-            <b>Источник:</b> ${sourceStr}<br>
-            ${point.gpsInView !== undefined ? `<b>Видимых спутников:</b> ${point.gpsInView}<br>` : ''}
-            Радиус: ${radius ? radius + " м" : "Не указан"}<br>
-            Координаты: ${coords[0]}, ${coords[1]}<br>
-            <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
-            <button class="route-btn" onclick="buildRoute(${coords[0]}, ${coords[1]})">Построить маршрут</button><br>
-            ${radius ? `<button class="toggle-btn" onclick="toggleRadius(${index})">Показать/Скрыть радиус</button>` : ''}
-          </div>`;
-
-        const placemark = new ymaps.Placemark(coords, { hintContent: sourceStr, balloonContent: balloonContent }, { preset: iconPreset });
-
-        myMap.geoObjects.add(placemark);
+        let circle = null;
         if (radius) {
-          const circle = new ymaps.Circle([coords, radius], {}, {
+          circle = new ymaps.Circle([coords, radius], {}, {
             fillOpacity: 0,
             strokeColor: "#0000FF",
             strokeOpacity: 0.8,
@@ -171,53 +157,37 @@
             visible: false
           });
           myMap.geoObjects.add(circle);
-          radiusObjects.push(circle);
         }
 
-        placemarks.push({ placemark });
+        let iconPreset = isTower ? 'islands#redCircleIcon' : 'islands#blueCircleIcon';
+
+        let balloonContent = `
+          <div class="balloon-content">
+            <b>Источник:</b> ${sourceStr}<br>
+            Радиус: ${radius ? radius + " м" : "Не указан"}<br>
+            Координаты: ${coords[0]}, ${coords[1]}<br>
+            <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
+            <button class="route-btn" onclick="buildRoute(${coords[0]}, ${coords[1]})">Построить маршрут</button><br>
+          </div>`;
+
+        const placemark = new ymaps.Placemark(coords, {
+          hintContent: sourceStr,
+          balloonContent: balloonContent
+        }, { preset: iconPreset });
+
+        myMap.geoObjects.add(placemark);
+        placemarks.push({ placemark, type: "tower" });
       });
 
-      window.toggleRadius = function(index) {
-        if (radiusObjects[index]) {
-          const currentVisibility = radiusObjects[index].options.get("visible");
-          radiusObjects[index].options.set("visible", !currentVisibility);
-        }
-      };
-
-      window.copyToClipboard = function(text) {
-        navigator.clipboard.writeText(text).then(() => {
-          showTemporaryMessage('Координаты скопированы: ' + text);
-        }).catch(() => {
-          showTemporaryMessage('Ошибка при копировании координат.');
-        });
-      };
-
-      window.buildRoute = function(lat, lon) {
-        if (/Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent)) {
-          window.open(`yandexnavi://build_route_on_map?lat_to=${lat}&lon_to=${lon}`, '_blank');
-        } else {
-          window.open(`https://yandex.ru/maps/?ll=${lon},${lat}&z=16&mode=routes`, '_blank');
-        }
-      };
-
-      function showTemporaryMessage(message) {
-        const messageDiv = document.createElement('div');
-        messageDiv.textContent = message;
-        messageDiv.className = 'temporary-message';
-        document.body.appendChild(messageDiv);
-        setTimeout(() => {
-          document.body.removeChild(messageDiv);
-        }, 3000);
-      }
-
-      const userForm = document.querySelector('.control-panel form');
+      // Обработка добавления пользовательской точки
+      const userForm = document.getElementById('userCoordsForm');
       userForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        submitCoordinates(myMap);
+        submitCoordinates();
       });
     }
 
-    function submitCoordinates(map) {
+    function submitCoordinates() {
       const coordsInput = document.getElementById('userCoords');
       const input = coordsInput.value.trim();
 
@@ -234,10 +204,15 @@
 
       const [lat, lon] = parsedCoords;
 
-      const userPlacemark = new ymaps.Placemark([lat, lon], { balloonContent: "Ваша позиция" }, { preset: 'islands#blueCircleIcon', draggable: true });
-      map.geoObjects.add(userPlacemark);
+      const userPlacemark = new ymaps.Placemark([lat, lon], {
+        balloonContent: "Ваша позиция"
+      }, {
+        preset: 'islands#blueCircleIcon',
+        draggable: true
+      });
 
-      userPlacemarks.push({ placemark: userPlacemark, linkedTower: null });
+      myMap.geoObjects.add(userPlacemark);
+      userPlacemarks.push({ placemark: userPlacemark });
 
       let nearestTower = null;
       let minDistance = Infinity;
@@ -251,8 +226,13 @@
       });
 
       if (nearestTower) {
-        const line = new ymaps.Polyline([[lat, lon], nearestTower.placemark.geometry.getCoordinates()], {}, { strokeColor: "#00FF00", strokeWidth: 2, strokeOpacity: 0.7 });
-        map.geoObjects.add(line);
+        const line = new ymaps.Polyline([[lat, lon], nearestTower.placemark.geometry.getCoordinates()], {}, {
+          strokeColor: "#00FF00",
+          strokeWidth: 2,
+          strokeOpacity: 0.7
+        });
+        myMap.geoObjects.add(line);
+
         const distanceKm = (minDistance / 1000).toFixed(2);
         userPlacemark.properties.set('balloonContent', `
           <div class="balloon-content">
@@ -264,7 +244,6 @@
       }
 
       coordsInput.value = '';
-
       showTemporaryMessage('Пользовательская точка добавлена.');
     }
 
@@ -283,16 +262,35 @@
         return [lat, lon];
       }
 
-      return null;
+      return null; 
     }
 
     function dmsToDecimal(degrees, minutes, seconds, direction) {
-      let decimal = parseFloat(degrees) + parseFloat(minutes)/60 + parseFloat(seconds)/3600;
+      let decimal = parseFloat(degrees) + parseFloat(minutes) / 60 + parseFloat(seconds) / 3600;
       if (direction === 'S' || direction === 'W') {
         decimal *= -1;
       }
       return decimal;
     }
+
+    function showTemporaryMessage(message) {
+      const messageDiv = document.createElement('div');
+      messageDiv.textContent = message;
+      messageDiv.className = 'temporary-message';
+      document.body.appendChild(messageDiv);
+      setTimeout(() => {
+        document.body.removeChild(messageDiv);
+      }, 3000);
+    }
+
+    function buildRoute(lat, lon) {
+      if (/Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent)) {
+        window.open(`yandexnavi://build_route_on_map?lat_to=${lat}&lon_to=${lon}`, '_blank');
+      } else {
+        window.open(`https://yandex.ru/maps/?ll=${lon},${lat}&z=16&mode=routes`, '_blank');
+      }
+    }
+
   </script>
 </body>
 </html>
