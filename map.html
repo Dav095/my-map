@@ -131,6 +131,7 @@
     let placemarks = []; 
     let lines = [];     
     let userPlacemarks = []; 
+    let radiusObjects = []; 
 
     function init() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -154,14 +155,7 @@
         controls: ['zoomControl', 'fullscreenControl']
       });
 
-      const radiusObjects = [];
-      const isMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
-      if (isMobile) {
-        myMap.behaviors.disable('scrollZoom');
-      }
-
       const imeiGroups = {};
-
       towerData.forEach((point, index) => {
         const coords = point.coords;
         const radius = point.radius;
@@ -241,33 +235,22 @@
         );
 
         myMap.geoObjects.add(placemark);
-        if (circle) {
-          myMap.geoObjects.add(circle);
+        if (isTower) {
+          placemarks.push({ type: 'tower', placemark });
+        } else if (isBlock) {
+          placemarks.push({ type: 'block', placemark });
         }
 
-        placemarks.push({
-          placemark,
-          imei,
-          type: type 
-        });
-      });
-
-      for (const imei in imeiGroups) {
-        const group = imeiGroups[imei];
-        if (group.towers.length > 0 && group.blocks.length > 0) {
-          const tower = group.towers[0];
-          for (const block of group.blocks) {
-            const line = new ymaps.GeoObject({
-              geometry: {
-                type: "LineString",
-                coordinates: [tower.coords, block.coords]
-              }
+        if (type === 'regular') {
+          const group = imeiGroups[imei];
+          if (group && group.towers.length > 0) {
+            group.towers.forEach(tower => {
+              const distance = ymaps.coordSystem.geo.getDistance(tower.coords, coords);
+              placemark.balloon.content += `<br><b>Расстояние до ближайшей вышки:</b> ${Math.round(distance)} м`;
             });
-            lines.push(line);
-            myMap.geoObjects.add(line);
           }
         }
-      }
+      });
 
       document.getElementById('showTowers').addEventListener('change', function() {
         toggleLayer(placemarks, 'tower', this.checked);
