@@ -104,23 +104,17 @@
   <script>
     ymaps.ready(init);
 
-    let placemarks = []; // { placemark, imei, type: 'tower'|'block'|'single' }
-    let lines = [];     // { line, imei }
-    let userPlacemarks = []; // { placemark, linkedTower }
+    let placemarks = [];
+    let lines = [];
+    let userPlacemarks = [];
 
     function init() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const dataParam = urlParams.get('data');
-      let towerData = [];
-      if (dataParam) {
-        try {
-          towerData = JSON.parse(decodeURIComponent(dataParam));
-        } catch (e) {
-          console.error("Ошибка при парсинге данных:", e);
-        }
-      }
+      const towerData = [
+        { coords: [55.7558, 37.6173], source: 'Яндекс', gpsInView: 14, radius: 100 },
+        { coords: [60.0225, 30.3017], source: 'Кэш', gpsInView: 20, radius: 200 }
+      ];
 
-      const defaultCenter = [55.755864, 37.617698]; 
+      const defaultCenter = [55.755864, 37.617698];
       const firstPoint = towerData.length > 0 ? towerData[0].coords : defaultCenter;
 
       const myMap = new ymaps.Map("map", {
@@ -138,7 +132,7 @@
       towerData.forEach((point, index) => {
         const coords = point.coords;
         const radius = point.radius;
-        const sourceStr = point.source; 
+        const sourceStr = point.source;
 
         let iconPreset = 'islands#redCircleIcon';
 
@@ -156,8 +150,16 @@
         const placemark = new ymaps.Placemark(coords, { hintContent: sourceStr, balloonContent: balloonContent }, { preset: iconPreset });
 
         myMap.geoObjects.add(placemark);
-        if (circle) {
+        if (radius) {
+          const circle = new ymaps.Circle([coords, radius], {}, {
+            fillOpacity: 0,
+            strokeColor: "#0000FF",
+            strokeOpacity: 0.8,
+            strokeWidth: 2,
+            visible: false
+          });
           myMap.geoObjects.add(circle);
+          radiusObjects.push(circle);
         }
 
         placemarks.push({ placemark });
