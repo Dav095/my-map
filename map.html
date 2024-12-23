@@ -73,7 +73,7 @@
     }
 
     .control-panel input[type="text"] {
-      width: 100px;
+      width: 200px;
       margin-right: 5px;
     }
 
@@ -92,7 +92,7 @@
         font-size: 12px;
       }
       .control-panel input[type="text"] {
-        width: 80px;
+        width: 150px;
       }
       .control-panel button {
         font-size: 10px;
@@ -108,10 +108,8 @@
     <hr>
     <h4>Добавить свои координаты</h4>
     <form onsubmit="submitCoordinates(); return false;">
-      <label for="userLat">Широта:</label>
-      <input type="text" id="userLat" name="userLat" required>
-      <label for="userLon">Долгота:</label>
-      <input type="text" id="userLon" name="userLon" required>
+      <label for="userCoords">Координаты (широта, долгота):</label>
+      <input type="text" id="userCoords" name="userCoords" placeholder="например: 55.7558, 37.6176" required>
       <button type="submit">Добавить точку</button>
     </form>
   </div>
@@ -119,12 +117,11 @@
   <script>
     ymaps.ready(init);
 
-    let placemarks = []; // { placemark, imei, type: 'tower'|'block'|'single' }
-    let lines = [];     // { line, imei }
-    let userPlacemarks = []; // { placemark, linkedTower }
+    let placemarks = [];
+    let lines = [];
+    let userPlacemarks = [];
 
     function init() {
-      // Получаем данные из URL
       const urlParams = new URLSearchParams(window.location.search);
       const dataParam = urlParams.get('data');
       let towerData = [];
@@ -145,101 +142,38 @@
         controls: ['zoomControl', 'fullscreenControl']
       });
 
-      const radiusObjects = [];
-      const isMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
-      if (isMobile) {
-        myMap.behaviors.disable('scrollZoom');
-      }
-
-      towerData.forEach((point, index) => {
+      towerData.forEach((point) => {
         const coords = point.coords;
-        const radius = point.radius;
         const sourceStr = point.source; 
-        const type = point.type || 'regular'; // Тип пина: 'single' или 'regular'
+        const type = point.type || 'regular'; 
 
-        let isBlock = sourceStr.includes("Блок");
-        let isTower = (sourceStr.includes("Яндекс") || sourceStr.includes("Кэш"));
-
-        let circle = null;
-        if (radius) {
-          circle = new ymaps.Circle(
-            [coords, radius],
-            {},
-            {
-              fillOpacity: 0,
-              strokeColor: "#0000FF",
-              strokeOpacity: 0.8,
-              strokeWidth: 2,
-              visible: false
-            }
-          );
-          radiusObjects.push(circle);
-          myMap.geoObjects.add(circle);
-        }
-
-        // Выбираем иконку в зависимости от того, вышка это или блок
-        let iconPreset = isTower ? 'islands#redCircleIcon' : 'islands#blueCircleIcon';
-        if (type === 'single') {
-          iconPreset = 'islands#orangeCircleIcon'; // Отличаем одиночные вышки другим цветом
-        }
-
-        // Формируем содержимое балуна в зависимости от типа пина
         let balloonContent = `
           <div class="balloon-content">
             <b>Источник:</b> ${sourceStr}<br>
-            ${type !== 'single' ? `<b>Видимых спутников:</b> ${point.gpsInView}<br>` : ''}
-            Радиус: ${radius ? radius + " м" : "Не указан"}<br>
+            Радиус: ${point.radius ? point.radius + " м" : "Не указан"}<br>
             Координаты: ${coords[0]}, ${coords[1]}<br>
             <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
         `;
-
         if (type === 'single') {
           balloonContent += `
             <button class="route-btn" onclick="buildRoute(${coords[0]}, ${coords[1]})">Построить маршрут</button><br>
           `;
         }
 
-        if (radius) {
-          balloonContent += `<button class="toggle-btn" onclick="toggleRadius(${index})">Показать/Скрыть радиус</button>`;
-        }
-
         balloonContent += `</div>`;
 
         const placemark = new ymaps.Placemark(
           coords,
-          {
-            hintContent: sourceStr,
-            balloonContent: balloonContent
-          },
-          { preset: iconPreset }
+          { hintContent: sourceStr, balloonContent: balloonContent },
+          { preset: 'islands#redCircleIcon' }
         );
 
         myMap.geoObjects.add(placemark);
-        if (circle) {
-          myMap.geoObjects.add(circle);
-        }
-
         placemarks.push({
           placemark,
-          imei: point.imei,
-          type: type // 'single' или 'regular'
+          type: type
         });
       });
-
-      window.toggleRadius = function(index) {
-        if (radiusObjects[index]) {
-          const currentVisibility = radiusObjects[index].options.get("visible");
-          radiusObjects[index].options.set("visible", !currentVisibility);
-        }
-      };
-
-      window.copyToClipboard = function(text) {
-        navigator.clipboard.writeText(text).then(() => {
-          showTemporaryMessage('Координаты скопированы: ' + text);
-        }).catch(() => {
-          showTemporaryMessage('Ошибка при копировании координат.');
-        });
-      };
 
       window.buildRoute = function(lat, lon) {
         if (/Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent)) {
@@ -249,29 +183,16 @@
         }
       };
 
-      function showTemporaryMessage(message) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'temporary-message';
-        messageDiv.textContent = message;
-        document.body.appendChild(messageDiv);
-        setTimeout(() => messageDiv.remove(), 3000);
-      }
-
       window.submitCoordinates = function() {
-        const latInput = document.getElementById('userLat');
-        const lonInput = document.getElementById('userLon');
-        const lat = parseFloat(latInput.value);
-        const lon = parseFloat(lonInput.value);
+        const userCoordsInput = document.getElementById('userCoords').value;
+        const coords = userCoordsInput.split(',').map(coord => parseFloat(coord.trim()));
 
-        if (isNaN(lat) || isNaN(lon)) {
-          showTemporaryMessage('Пожалуйста, введите корректные числа для широты и долготы.');
+        if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
+          showTemporaryMessage('Пожалуйста, введите корректные координаты.');
           return;
         }
 
-        const userCoords = [lat, lon];
-
-        // Создание пользовательской метки
-        const userPlacemark = new ymaps.Placemark(userCoords, {
+        const userPlacemark = new ymaps.Placemark(coords, {
           balloonContent: "Ваша позиция"
         }, {
           preset: 'islands#blueCircleIcon',
@@ -279,30 +200,27 @@
         });
 
         myMap.geoObjects.add(userPlacemark);
-        userPlacemarks.push({ placemark: userPlacemark, linkedTower: null });
+        userPlacemarks.push({ placemark: userPlacemark });
 
         let nearestTower = null;
         let minDistance = Infinity;
 
         placemarks.forEach(p => {
-          if (p.type === 'tower' || p.type === 'single' || p.type === 'block') {
-            const distance = ymaps.coordSystem.geo.getDistance(userCoords, p.placemark.geometry.getCoordinates());
-            if (distance < minDistance) {
-              minDistance = distance;
-              nearestTower = p;
-            }
+          const distance = ymaps.coordSystem.geo.getDistance(coords, p.placemark.geometry.getCoordinates());
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearestTower = p;
           }
         });
 
         if (nearestTower) {
-          // Связка с ближайшей вышкой
-          const line = new ymaps.Polyline([userCoords, nearestTower.placemark.geometry.getCoordinates()], {}, {
+          const line = new ymaps.Polyline([coords, nearestTower.placemark.geometry.getCoordinates()], {}, {
             strokeColor: "#00FF00",
             strokeWidth: 2,
             strokeOpacity: 0.7
           });
           myMap.geoObjects.add(line);
-          lines.push({ line, imei: nearestTower.imei });
+          lines.push({ line });
 
           const distanceKm = (minDistance / 1000).toFixed(2);
           userPlacemark.properties.set('balloonContent', `
@@ -314,11 +232,17 @@
           `);
         }
 
-        latInput.value = '';
-        lonInput.value = '';
-
         showTemporaryMessage('Пользовательская точка добавлена.');
+        document.getElementById('userCoords').value = '';
       };
+    }
+
+    function showTemporaryMessage(message) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'temporary-message';
+      messageDiv.textContent = message;
+      document.body.appendChild(messageDiv);
+      setTimeout(() => messageDiv.remove(), 3000);
     }
   </script>
 </body>
