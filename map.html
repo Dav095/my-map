@@ -123,49 +123,40 @@
       <button type="submit">Добавить точку</button>
     </form>
   </div>
+
   <script>
     let myMap; // Объявляем глобальную переменную для карты
 
     ymaps.ready(init);
 
-    let placemarks = []; // { placemark, imei }
+    let placemarks = []; // { placemark, imei, type: 'tower'|'block'|'single' }
     let lines = [];     // { line, imei }
     let userPlacemarks = []; // { placemark, linkedTower }
 
     function init() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const dataParam = urlParams.get('data');
-      let towerData = [];
-      if (dataParam) {
-        try {
-          towerData = JSON.parse(decodeURIComponent(dataParam));
-        } catch (e) {
-          console.error("Ошибка при парсинге данных:", e);
-          showTemporaryMessage('Ошибка при загрузке данных карты.');
-        }
-      }
-
-      const defaultCenter = [55.755864, 37.617698];
-      const firstPoint = towerData.length > 0 ? towerData[0].coords : defaultCenter;
-
+      const defaultCenter = [55.755864, 37.617698]; // Москва
       myMap = new ymaps.Map("map", {
-        center: firstPoint,
+        center: defaultCenter,
         zoom: 12,
         controls: ['zoomControl', 'fullscreenControl']
       });
 
-      const radiusObjects = [];
-      const isMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
-      if (isMobile) {
-        myMap.behaviors.disable('scrollZoom');
-      }
+      const towerData = []; // Здесь будут данные для вышек, подставьте ваши данные
+
+      const imeiGroups = {}; // Группируем вышки по IMEI
 
       towerData.forEach((point, index) => {
         const coords = point.coords;
         const radius = point.radius;
         const sourceStr = point.source;
+        const type = point.type || 'regular';
 
         let imei = null;
+        if (type === 'regular') {
+          let imeiMatch = sourceStr.match(/IMEI:([\d]+)/);
+          imei = imeiMatch ? imeiMatch[1] : null;
+        }
+
         let isBlock = sourceStr.includes("Блок");
         let isTower = (sourceStr.includes("Яндекс") || sourceStr.includes("Кэш"));
 
@@ -193,21 +184,24 @@
               visible: false
             }
           );
-          radiusObjects.push(circle);
           myMap.geoObjects.add(circle);
         }
 
-        // Выбираем иконку, общая для всех
-        let iconPreset = 'islands#redCircleIcon'; // Все метки будут красными
+        let iconPreset = isTower ? 'islands#redCircleIcon' : 'islands#blueCircleIcon';
+        if (type === 'single') {
+          iconPreset = 'islands#orangeCircleIcon';
+        }
 
-        // Формируем содержимое балуна
         let balloonContent = `
           <div class="balloon-content">
             <b>Источник:</b> ${sourceStr}<br>
             Радиус: ${radius ? radius + " м" : "Не указан"}<br>
             Координаты: ${coords[0]}, ${coords[1]}<br>
             <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
-            <button class="route-btn" onclick="buildRoute(${coords[0]}, ${coords[1]})">Построить маршрут</button><br>
+        `;
+
+        balloonContent += `
+          <button class="route-btn" onclick="buildRoute(${coords[0]}, ${coords[1]})">Построить маршрут</button><br>
         `;
 
         if (radius) {
@@ -226,66 +220,103 @@
         );
 
         myMap.geoObjects.add(placemark);
-        if (circle) {
-          myMap.geoObjects.add(circle);
-        }
-
         placemarks.push({
           placemark,
           imei,
+          type: type
         });
       });
 
       window.toggleRadius = function(index) {
-        if (radiusObjects[index]) {
-          const currentVisibility = radiusObjects[index].options.get("visible");
-          radiusObjects[index].options.set("visible", !currentVisibility);
+        const circle = placemarks[index].circle;
+        if (circle) {
+          const currentVisibility = circle.options.get("visible");
+          circle.options.set('visible', !currentVisibility);
         }
       };
 
-      window.copyToClipboard = function (text) {
-        navigator.clipboard.writeText(text).then(function() {
-          showTemporaryMessage('Координаты скопированы!');
-        }).catch(function(err) {
-          console.error('Ошибка при копировании: ', err);
+      window.copyToClipboard = function(text) {
+        navigator.clipboard.writeText(text).then(() => {
+          showTemporaryMessage('Координаты скопированы: ' + text);
+        }).catch(() => {
+          showTemporaryMessage('Ошибка при копировании координат.');
         });
       };
 
-      window.buildRoute = function (lat, lon) {
-        if (myMap) {
-          myMap.geoObjects.removeAll();
-          myMap.setCenter([lat, lon], 14);
-          myMap.geoObjects.add(new ymaps.Placemark([lat, lon], { balloonContent: 'Ваша точка!' }));
+      window.buildRoute = function(lat, lon) {
+        if (/Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent)) {
+          window.open(`yandexnavi://build_route_on_map?lat_to=${lat}&lon_to=${lon}`, '_blank');
+        } else {
+          window.open(`https://yandex.ru/maps/?ll=${lon},${lat}&z=16&mode=routes`, '_blank');
         }
       };
+
+      function showTemporaryMessage(message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.textContent = message;
+        messageDiv.className = 'temporary-message';
+        document.body.appendChild(messageDiv);
+        setTimeout(() => {
+          document.body.removeChild(messageDiv);
+        }, 3000);
+      }
 
       document.getElementById('userCoordsForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        const coordsInput = document.getElementById('userCoords').value.split(',');
-        const lat = parseFloat(coordsInput[0].trim());
-        const lon = parseFloat(coordsInput[1].trim());
-
-        if (isNaN(lat) || isNaN(lon)) {
-          showTemporaryMessage('Некорректные координаты!');
-          return;
+        const userCoords = document.getElementById('userCoords').value;
+        const coordsArr = userCoords.split(',');
+        if (coordsArr.length === 2) {
+          const lat = parseFloat(coordsArr[0]);
+          const lon = parseFloat(coordsArr[1]);
+          if (!isNaN(lat) && !isNaN(lon)) {
+            addPlacemark(lat, lon, 'user', userCoords);
+            document.getElementById('userCoords').value = ''; // Очистка поля
+          }
         }
+      });
 
-        const placemark = new ymaps.Placemark([lat, lon], {
-          balloonContent: `<div class="balloon-content">Это ваши координаты!<br><button class="copy-btn" onclick="copyToClipboard('${lat}, ${lon}')">Скопировать координаты</button><br><button class="route-btn" onclick="buildRoute(${lat}, ${lon})">Построить маршрут</button></div>`
+      function addPlacemark(lat, lon, type, sourceStr, radius) {
+        const coords = [lat, lon];
+        let nearestTower = null;
+        let minDistance = Infinity;
+
+        placemarks.forEach(p => {
+          const distance = ymaps.coordSystem.geo.getDistance([lat, lon], p.placemark.geometry.getCoordinates());
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearestTower = p;
+          }
+        });
+
+        const placemark = new ymaps.Placemark(coords, {
+          balloonContent: createBalloonContent(coords, sourceStr, radius, nearestTower)
+        }, {
+          preset: 'islands#icon',
+          iconColor: '#0095b6'
         });
 
         myMap.geoObjects.add(placemark);
-        userPlacemarks.push({ placemark });
-        showTemporaryMessage('Точка добавлена!');
-      });
-    }
+        userPlacemarks.push({ placemark, linkedTower: nearestTower });
+      }
 
-    function showTemporaryMessage(text) {
-      const message = document.createElement("div");
-      message.classList.add("temporary-message");
-      message.innerText = text;
-      document.body.appendChild(message);
-      setTimeout(() => message.remove(), 3000);
+      function createBalloonContent(coords, sourceStr, radius, nearestTower) {
+        let balloonContent = `
+          <div class="balloon-content">
+            <b>Источник:</b> ${sourceStr}<br>
+            ${nearestTower ? `<b>Ближайшая вышка:</b> ${nearestTower.type}<br>` : ''}
+            Радиус: ${radius ? radius + " м" : "Не указан"}<br>
+            Координаты: ${coords[0]}, ${coords[1]}<br>
+            <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
+        `;
+        balloonContent += `
+          <button class="route-btn" onclick="buildRoute(${coords[0]}, ${coords[1]})">Построить маршрут</button><br>
+        `;
+        if (radius) {
+          balloonContent += `<button class="toggle-btn" onclick="toggleRadius()">Показать/Скрыть радиус</button>`;
+        }
+        balloonContent += `</div>`;
+        return balloonContent;
+      }
     }
   </script>
 </body>
