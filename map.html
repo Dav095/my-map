@@ -123,9 +123,9 @@
       <button type="submit">Добавить точку</button>
     </form>
   </div>
+
   <script>
     let myMap; // Объявляем глобальную переменную для карты
-
     ymaps.ready(init);
 
     let placemarks = []; // { placemark, imei, type: 'tower'|'block'|'single' }
@@ -133,7 +133,6 @@
     let userPlacemarks = []; // { placemark, linkedTower }
 
     function init() {
-      // Получаем данные из URL
       const urlParams = new URLSearchParams(window.location.search);
       const dataParam = urlParams.get('data');
       let towerData = [];
@@ -146,7 +145,7 @@
         }
       }
 
-      const defaultCenter = [55.755864, 37.617698]; 
+      const defaultCenter = [55.755864, 37.617698];
       const firstPoint = towerData.length > 0 ? towerData[0].coords : defaultCenter;
 
       myMap = new ymaps.Map("map", {
@@ -166,7 +165,7 @@
       towerData.forEach((point, index) => {
         const coords = point.coords;
         const radius = point.radius;
-        const sourceStr = point.source; 
+        const sourceStr = point.source;
         const type = point.type || 'regular'; 
 
         let imei = null;
@@ -208,7 +207,7 @@
 
         let iconPreset = isTower ? 'islands#redCircleIcon' : 'islands#blueCircleIcon';
         if (type === 'single') {
-          iconPreset = 'islands#orangeCircleIcon'; 
+          iconPreset = 'islands#orangeCircleIcon';
         }
 
         let balloonContent = `
@@ -246,84 +245,93 @@
           myMap.geoObjects.add(circle);
         }
 
-        placemarks.push({
-          placemark,
-          imei,
-          type: type 
+        placemarks.push({ placemark, imei, type });
+
+        placemark.events.add('click', function() {
+          const content = placemark.properties.get('balloonContent');
+          alert(content);
         });
       });
 
-      for (const imei in imeiGroups) {
-        const group = imeiGroups[imei];
-        if (group.towers.length > 0 && group.blocks.length > 0) {
-          const tower = group.towers[0];
-          for (const block of group.blocks) {
-            const line = new ymaps.Polyline(
-              [tower.coords, block.coords],
-              { balloonContent: "Блок и вышка для IMEI " + imei },
-              { strokeColor: '#FF0000', strokeWidth: 2, strokeOpacity: 0.5 }
-            );
-            myMap.geoObjects.add(line);
-            lines.push({ line, imei });
+      document.getElementById('showTowers').addEventListener('change', function () {
+        toggleLayer('tower', this.checked);
+      });
+      document.getElementById('showBlocks').addEventListener('change', function () {
+        toggleLayer('block', this.checked);
+      });
+
+      document.getElementById('searchBtn').addEventListener('click', function() {
+        searchByIMEI(document.getElementById('imeiSearch').value);
+      });
+
+      document.getElementById('userCoordsForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        addUserCoords(document.getElementById('userCoords').value);
+      });
+
+      function toggleLayer(type, isVisible) {
+        placemarks.forEach(item => {
+          if (item.type === type) {
+            item.placemark.options.set('visible', isVisible);
           }
+        });
+      }
+
+      function buildRoute(lat, lon) {
+        if (!navigator.geolocation) {
+          alert("Геолокация не поддерживается вашим браузером");
+          return;
         }
+
+        navigator.geolocation.getCurrentPosition(function(position) {
+          const userCoords = [position.coords.latitude, position.coords.longitude];
+          const route = new ymaps.route([userCoords, [lat, lon]]);
+          route.editor.start();
+          myMap.geoObjects.add(route);
+        });
       }
 
       function showTemporaryMessage(message) {
-        const messageDiv = document.createElement('div');
-        messageDiv.textContent = message;
-        messageDiv.className = 'temporary-message';
-        document.body.appendChild(messageDiv);
+        const messageElement = document.createElement('div');
+        messageElement.className = 'temporary-message';
+        messageElement.textContent = message;
+        document.body.appendChild(messageElement);
         setTimeout(() => {
-          document.body.removeChild(messageDiv);
-        }, 3000);
+          messageElement.remove();
+        }, 5000);
       }
 
-      window.buildRoute = function(lat, lon) {
-        navigator.geolocation.getCurrentPosition((position) => {
-          const userLat = position.coords.latitude;
-          const userLon = position.coords.longitude;
-          const route = ymaps.route([userLat, userLon], [lat, lon]);
-          route.then(function (route) {
-            myMap.geoObjects.add(route);
-            myMap.setBounds(route.getBounds(), { checkZoomRange: true });
-          }, function (error) {
-            alert("Ошибка при построении маршрута: " + error.message);
-          });
-        }, function (error) {
-          alert("Не удалось определить ваше местоположение: " + error.message);
-        });
-      };
-
-      window.copyToClipboard = function(text) {
+      function copyToClipboard(text) {
         navigator.clipboard.writeText(text).then(() => {
-          showTemporaryMessage('Координаты скопированы: ' + text);
-        }).catch(() => {
-          showTemporaryMessage('Ошибка при копировании координат.');
+          showTemporaryMessage('Координаты скопированы в буфер обмена');
         });
-      };
+      }
+    }
 
-      window.toggleRadius = function(index) {
-        const circle = radiusObjects[index];
-        circle.options.set('visible', !circle.options.get('visible'));
-      };
+    function searchByIMEI(imei) {
+      const found = placemarks.filter(item => item.imei === imei);
+      if (found.length > 0) {
+        const coords = found[0].placemark.geometry.getCoordinates();
+        myMap.setCenter(coords, 15);
+      } else {
+        alert("Не найдено объектов с таким IMEI");
+      }
+    }
 
-      document.getElementById('userCoordsForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const coordsInput = document.getElementById('userCoords');
-        const coords = coordsInput.value.trim().split(',').map(coord => parseFloat(coord.trim()));
+    function addUserCoords(coords) {
+      const [lat, lon] = coords.split(',').map(Number);
+      if (!lat || !lon) {
+        alert('Некорректные координаты');
+        return;
+      }
 
-        if (coords.length === 2) {
-          const userPlacemark = new ymaps.Placemark(coords, {
-            balloonContent: "Ваша позиция"
-          }, { preset: 'islands#blueCircleIcon', draggable: true });
-
-          myMap.geoObjects.add(userPlacemark);
-          userPlacemarks.push({ placemark: userPlacemark });
-
-          coordsInput.value = ''; // Очистка поля ввода
-        }
+      const placemark = new ymaps.Placemark([lat, lon], { balloonContent: 'Ваша точка' }, {
+        preset: 'islands#redCircleIcon'
       });
+      myMap.geoObjects.add(placemark);
+
+      userPlacemarks.push({ placemark });
+      alert('Точка добавлена');
     }
   </script>
 </body>
