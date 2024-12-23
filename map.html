@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>Карта вышек</title>
-  <script src="https://api-maps.yandex.ru/2.1/?apikey=2a74af8c-a82e-4f60-ad7a-34085c8248c3&lang=ru_RU" type="text/javascript"></script>
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=YOUR_YANDEX_API_KEY&lang=ru_RU" type="text/javascript"></script>
   <style>
     html, body, #map {
       width: 100%;
@@ -120,6 +120,7 @@
     let placemarks = [];
     let lines = [];
     let userPlacemarks = [];
+    let radiusObjects = [];
 
     function init() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -146,11 +147,12 @@
         const coords = point.coords;
         const sourceStr = point.source; 
         const type = point.type || 'regular'; 
+        const radius = point.radius;
 
         let balloonContent = `
           <div class="balloon-content">
             <b>Источник:</b> ${sourceStr}<br>
-            Радиус: ${point.radius ? point.radius + " м" : "Не указан"}<br>
+            Радиус: ${radius ? radius + " м" : "Не указан"}<br>
             Координаты: ${coords[0]}, ${coords[1]}<br>
             <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
         `;
@@ -160,7 +162,9 @@
           `;
         }
 
-        balloonContent += `</div>`;
+        balloonContent += `
+            <button class="toggle-btn" onclick="toggleRadius(${placemarks.length})">Показать/Скрыть радиус</button>
+          </div>`;
 
         const placemark = new ymaps.Placemark(
           coords,
@@ -169,10 +173,19 @@
         );
 
         myMap.geoObjects.add(placemark);
-        placemarks.push({
-          placemark,
-          type: type
-        });
+        placemarks.push({ placemark, type: type });
+
+        if (radius) {
+          const circle = new ymaps.Circle([coords, radius], {}, {
+            fillOpacity: 0.1,
+            strokeColor: "#0000FF",
+            strokeOpacity: 0.8,
+            strokeWidth: 2,
+            visible: false
+          });
+          myMap.geoObjects.add(circle);
+          radiusObjects.push(circle);
+        }
       });
 
       window.buildRoute = function(lat, lon) {
@@ -181,6 +194,22 @@
         } else {
           window.open(`https://yandex.ru/maps/?ll=${lon},${lat}&z=16&mode=routes`, '_blank');
         }
+      };
+
+      window.toggleRadius = function(index) {
+        const circle = radiusObjects[index];
+        if (circle) {
+          const currentVisibility = circle.options.get("visible");
+          circle.options.set("visible", !currentVisibility);
+        }
+      };
+
+      window.copyToClipboard = function(text) {
+        navigator.clipboard.writeText(text).then(() => {
+          showTemporaryMessage('Координаты скопированы: ' + text);
+        }).catch(() => {
+          showTemporaryMessage('Ошибка при копировании координат.');
+        });
       };
 
       window.submitCoordinates = function() {
