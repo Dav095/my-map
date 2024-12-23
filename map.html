@@ -248,8 +248,7 @@
       });
 
       if (nearestDistance < Infinity) {
-        placemark.properties.set('balloonContent', 
-          `Это моя точка на карте!<br>Расстояние до ближайшей вышки: ${Math.round(nearestDistance)} м`);
+        placemark.properties.set('balloonContent', `Это моя точка на карте!<br>Расстояние до ближайшей вышки: ${Math.round(nearestDistance)} м`);
       }
 
       myMap.geoObjects.add(placemark);
