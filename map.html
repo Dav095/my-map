@@ -243,29 +243,49 @@
         }
       };
 
-      window.copyToClipboard = function(text) {
-        navigator.clipboard.writeText(text).then(() => {
-          showTemporaryMessage('Координаты скопированы: ' + text);
-        }).catch(() => {
-          showTemporaryMessage('Ошибка при копировании координат.');
+      window.copyToClipboard = function (text) {
+        navigator.clipboard.writeText(text).then(function() {
+          showTemporaryMessage('Координаты скопированы!');
+        }).catch(function(err) {
+          console.error('Ошибка при копировании: ', err);
         });
       };
 
-      window.buildRoute = function(lat, lon) {
-        if (/Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent)) {
-          window.open(`yandexnavi://build_route_on_map?lat_to=${lat}&lon_to=${lon}`, '_blank');
-        } else {
-          window.open(`https://yandex.ru/maps/?pt=${lon},${lat}&z=14`, '_blank');
+      window.buildRoute = function (lat, lon) {
+        if (myMap) {
+          myMap.geoObjects.removeAll();
+          myMap.setCenter([lat, lon], 14);
+          myMap.geoObjects.add(new ymaps.Placemark([lat, lon], { balloonContent: 'Ваша точка!' }));
         }
       };
 
-      function showTemporaryMessage(text) {
-        const message = document.createElement("div");
-        message.classList.add("temporary-message");
-        message.innerText = text;
-        document.body.appendChild(message);
-        setTimeout(() => message.remove(), 3000);
-      }
+      document.getElementById('userCoordsForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const coordsInput = document.getElementById('userCoords').value.split(',');
+        const lat = parseFloat(coordsInput[0].trim());
+        const lon = parseFloat(coordsInput[1].trim());
+
+        if (isNaN(lat) || isNaN(lon)) {
+          showTemporaryMessage('Некорректные координаты!');
+          return;
+        }
+
+        const placemark = new ymaps.Placemark([lat, lon], {
+          balloonContent: `<div class="balloon-content">Это ваши координаты!<br><button class="copy-btn" onclick="copyToClipboard('${lat}, ${lon}')">Скопировать координаты</button><br><button class="route-btn" onclick="buildRoute(${lat}, ${lon})">Построить маршрут</button></div>`
+        });
+
+        myMap.geoObjects.add(placemark);
+        userPlacemarks.push({ placemark });
+        showTemporaryMessage('Точка добавлена!');
+      });
+    }
+
+    function showTemporaryMessage(text) {
+      const message = document.createElement("div");
+      message.classList.add("temporary-message");
+      message.innerText = text;
+      document.body.appendChild(message);
+      setTimeout(() => message.remove(), 3000);
     }
   </script>
 </body>
