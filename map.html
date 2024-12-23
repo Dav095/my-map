@@ -65,6 +65,7 @@
       z-index: 999;
       font-size: 14px;
       font-family: Arial, sans-serif;
+      max-width: 200px;
     }
 
     .control-panel label {
@@ -73,28 +74,34 @@
     }
 
     .control-panel input[type="text"] {
-      width: 100px;
-      margin-right: 5px;
+      width: 100%;
+      margin-bottom: 5px;
+      padding: 5px;
+      box-sizing: border-box;
     }
 
     .control-panel button {
-      padding: 3px 6px;
+      width: 100%;
+      padding: 5px;
       font-size: 12px;
       background-color: #2196F3;
       color: white;
       border: none;
       cursor: pointer;
       border-radius: 3px;
+      margin-bottom: 5px;
     }
 
     @media (max-width: 768px) {
       .control-panel {
         font-size: 12px;
+        max-width: 150px;
       }
       .control-panel input[type="text"] {
-        width: 80px;
+        padding: 3px;
       }
       .control-panel button {
+        padding: 3px;
         font-size: 10px;
       }
     }
@@ -111,15 +118,14 @@
     </div>
     <hr>
     <h4>Добавить свои координаты</h4>
-    <form onsubmit="submitCoordinates(); return false;">
-      <label for="userLat">Широта:</label>
-      <input type="text" id="userLat" name="userLat" required>
-      <label for="userLon">Долгота:</label>
-      <input type="text" id="userLon" name="userLon" required>
+    <form id="userCoordsForm">
+      <input type="text" id="userCoords" name="userCoords" placeholder="Широта, Долгота" required>
       <button type="submit">Добавить точку</button>
     </form>
   </div>
   <script>
+    let myMap; // Объявляем глобальную переменную для карты
+
     ymaps.ready(init);
 
     let placemarks = []; // { placemark, imei, type: 'tower'|'block'|'single' }
@@ -136,13 +142,14 @@
           towerData = JSON.parse(decodeURIComponent(dataParam));
         } catch (e) {
           console.error("Ошибка при парсинге данных:", e);
+          showTemporaryMessage('Ошибка при загрузке данных карты.');
         }
       }
 
       const defaultCenter = [55.755864, 37.617698]; 
       const firstPoint = towerData.length > 0 ? towerData[0].coords : defaultCenter;
 
-      const myMap = new ymaps.Map("map", {
+      myMap = new ymaps.Map("map", {
         center: firstPoint,
         zoom: 12,
         controls: ['zoomControl', 'fullscreenControl']
@@ -213,15 +220,13 @@
             ${type !== 'single' ? `<b>Видимых спутников:</b> ${point.gpsInView}<br>` : ''}
             Радиус: ${radius ? radius + " м" : "Не указан"}<br>
             Координаты: ${coords[0]}, ${coords[1]}<br>
-        `;
-
-        if (imei) {
-          balloonContent += `<b>IMEI:</b> ${imei}<br>`;
-        }
-
-        balloonContent += `
             <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
         `;
+
+         if (imei) {
+         balloonContent += `<b>IMEI:</b> ${imei}<br>`;
+         }
+
 
         if (type === 'single') {
           balloonContent += `
@@ -361,35 +366,39 @@
       updateVisibility(); // Первоначальная установка видимости
 
       // Обработка добавления пользовательских координат
-      const userForm = document.querySelector('.control-panel form');
+      const userForm = document.getElementById('userCoordsForm');
       userForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        submitCoordinates(myMap);
+        submitCoordinates();
       });
     }
 
-    function submitCoordinates(map) {
-      const latInput = document.getElementById('userLat');
-      const lonInput = document.getElementById('userLon');
-      const lat = parseFloat(latInput.value);
-      const lon = parseFloat(lonInput.value);
+    function submitCoordinates() {
+      const coordsInput = document.getElementById('userCoords');
+      const input = coordsInput.value.trim();
 
-      if (isNaN(lat) || isNaN(lon)) {
-        showTemporaryMessage('Пожалуйста, введите корректные числа для широты и долготы.');
+      if (!input) {
+        showTemporaryMessage('Пожалуйста, введите координаты.');
         return;
       }
 
-      const userCoords = [lat, lon];
+      const parsedCoords = parseCoordinates(input);
+      if (!parsedCoords) {
+        showTemporaryMessage('Неверный формат координат. Попробуйте: "55.7558, 37.6173" или "55°45\'21"N 37°36\'44"E".');
+        return;
+      }
+
+      const [lat, lon] = parsedCoords;
 
       // Создание пользовательской метки
-      const userPlacemark = new ymaps.Placemark(userCoords, {
+      const userPlacemark = new ymaps.Placemark([lat, lon], {
         balloonContent: "Ваша позиция"
       }, {
         preset: 'islands#blueCircleIcon',
         draggable: true
       });
 
-      map.geoObjects.add(userPlacemark);
+      myMap.geoObjects.add(userPlacemark);
       userPlacemarks.push({ placemark: userPlacemark, linkedTower: null });
 
       // Автоматическое связывание с ближайшей вышкой
@@ -398,7 +407,7 @@
 
       placemarks.forEach(p => {
         if (p.type === 'tower' || p.type === 'single') {
-          const distance = ymaps.coordSystem.geo.getDistance(userCoords, p.placemark.geometry.getCoordinates());
+          const distance = ymaps.coordSystem.geo.getDistance([lat, lon], p.placemark.geometry.getCoordinates());
           if (distance < minDistance) {
             minDistance = distance;
             nearestTower = p;
@@ -408,12 +417,12 @@
 
       if (nearestTower) {
         // Связка с ближайшей вышкой
-        const line = new ymaps.Polyline([userCoords, nearestTower.placemark.geometry.getCoordinates()], {}, {
+        const line = new ymaps.Polyline([[lat, lon], nearestTower.placemark.geometry.getCoordinates()], {}, {
           strokeColor: "#00FF00",
           strokeWidth: 2,
           strokeOpacity: 0.7
         });
-        map.geoObjects.add(line);
+        myMap.geoObjects.add(line);
         lines.push({ line, imei: nearestTower.imei });
 
         // Вычисление расстояния
@@ -427,11 +436,41 @@
         `);
       }
 
-      // Сброс полей ввода
-      latInput.value = '';
-      lonInput.value = '';
+      // Сброс поля ввода
+      coordsInput.value = '';
 
       showTemporaryMessage('Пользовательская точка добавлена.');
+    }
+
+    function parseCoordinates(input) {
+      // Попытка разобрать координаты в различных форматах
+      // Формат 1: "55.7558, 37.6173" или "55.7558 37.6173"
+      let regexDecimal = /^([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)$/;
+      let match = input.match(regexDecimal);
+      if (match) {
+        return [parseFloat(match[1]), parseFloat(match[2])];
+      }
+
+      // Формат 2: "55°45'21\"N 37°36'44\"E"
+      let regexDMS = /^(\d{1,3})°\s*(\d{1,2})'\s*(\d{1,2})\"?\s*([NS]),?\s*(\d{1,3})°\s*(\d{1,2})'\s*(\d{1,2})\"?\s*([EW])$/i;
+      match = input.match(regexDMS);
+      if (match) {
+        let lat = dmsToDecimal(match[1], match[2], match[3], match[4].toUpperCase());
+        let lon = dmsToDecimal(match[5], match[6], match[7], match[8].toUpperCase());
+        return [lat, lon];
+      }
+
+      // Добавьте дополнительные форматы при необходимости
+
+      return null; // Невозможно разобрать координаты
+    }
+
+    function dmsToDecimal(degrees, minutes, seconds, direction) {
+      let decimal = parseFloat(degrees) + parseFloat(minutes)/60 + parseFloat(seconds)/3600;
+      if (direction === 'S' || direction === 'W') {
+        decimal *= -1;
+      }
+      return decimal;
     }
 
     function showTemporaryMessage(message) {
