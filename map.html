@@ -129,8 +129,7 @@
     ymaps.ready(init);
 
     let placemarks = []; 
-    let lines = [];     
-    let userPlacemarks = []; 
+    let userPlacemarks = []; // Массив пользовательских точек
     let radiusObjects = []; 
 
     function init() {
@@ -155,51 +154,14 @@
         controls: ['zoomControl', 'fullscreenControl']
       });
 
-      const imeiGroups = {};
+      // Проходим по данным вышек и добавляем их на карту
       towerData.forEach((point, index) => {
         const coords = point.coords;
         const radius = point.radius;
         const sourceStr = point.source; 
         const type = point.type || 'regular'; 
 
-        let imei = null;
-        if (type === 'regular') {
-          let imeiMatch = sourceStr.match(/IMEI:([\d]+)/);
-          imei = imeiMatch ? imeiMatch[1] : null;
-        }
-
-        let isBlock = sourceStr.includes("Блок");
-        let isTower = (sourceStr.includes("Яндекс") || sourceStr.includes("Кэш"));
-
-        if (imei) {
-          if (!imeiGroups[imei]) {
-            imeiGroups[imei] = { towers: [], blocks: [] };
-          }
-          if (isTower) {
-            imeiGroups[imei].towers.push({ coords });
-          } else if (isBlock) {
-            imeiGroups[imei].blocks.push({ coords });
-          }
-        }
-
-        let circle = null;
-        if (radius) {
-          circle = new ymaps.Circle(
-            [coords, radius],
-            {},
-            {
-              fillOpacity: 0,
-              strokeColor: "#0000FF",
-              strokeOpacity: 0.8,
-              strokeWidth: 2,
-              visible: false
-            }
-          );
-          radiusObjects.push(circle);
-          myMap.geoObjects.add(circle);
-        }
-
-        let iconPreset = isTower ? 'islands#redCircleIcon' : 'islands#blueCircleIcon';
+        let iconPreset = type === 'regular' ? 'islands#redCircleIcon' : 'islands#blueCircleIcon';
         if (type === 'single') {
           iconPreset = 'islands#orangeCircleIcon';
         }
@@ -207,17 +169,10 @@
         let balloonContent = `
           <div class="balloon-content">
             <b>Источник:</b> ${sourceStr}<br>
-            ${type !== 'single' ? `<b>Видимых спутников:</b> ${point.gpsInView}<br>` : ''}
             Радиус: ${radius ? radius + " м" : "Не указан"}<br>
             Координаты: ${coords[0]}, ${coords[1]}<br>
             <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
         `;
-
-        if (type === 'single') {
-          balloonContent += `
-            <button class="route-btn" onclick="buildRoute(${coords[0]}, ${coords[1]})">Построить маршрут</button><br>
-          `;
-        }
 
         if (radius) {
           balloonContent += `<button class="toggle-btn" onclick="toggleRadius(${index})">Показать/Скрыть радиус</button>`;
@@ -237,38 +192,10 @@
         );
 
         myMap.geoObjects.add(placemark);
-        placemarks.push({ type, placemark, circle, coords });
-
-        if (isTower) {
-          placemarks.push({ type: 'tower', placemark });
-        } else if (isBlock) {
-          placemarks.push({ type: 'block', placemark });
-        }
-
-        if (type === 'regular') {
-          const group = imeiGroups[imei];
-          if (group && group.towers.length > 0) {
-            group.towers.forEach(tower => {
-              const distance = ymaps.coordSystem.geo.getDistance(tower.coords, coords);
-              placemark.balloon.content += `<br><b>Расстояние до ближайшей вышки:</b> ${Math.round(distance)} м`;
-            });
-          }
-        }
+        placemarks.push({ type, placemark, coords });
       });
 
-      document.getElementById('showTowers').addEventListener('change', function() {
-        toggleLayer(placemarks, 'tower', this.checked);
-      });
-
-      document.getElementById('showBlocks').addEventListener('change', function() {
-        toggleLayer(placemarks, 'block', this.checked);
-      });
-
-      document.getElementById('searchBtn').addEventListener('click', function() {
-        const imei = document.getElementById('imeiSearch').value;
-        searchByIMEI(imei, imeiGroups);
-      });
-
+      // Слушатель для добавления пользовательской точки
       const userCoordsForm = document.getElementById('userCoordsForm');
       userCoordsForm.addEventListener('submit', function(event) {
         event.preventDefault();
@@ -282,6 +209,7 @@
       });
     }
 
+    // Функция отображения временных сообщений
     function showTemporaryMessage(message) {
       const messageElement = document.createElement('div');
       messageElement.classList.add('temporary-message');
@@ -292,34 +220,14 @@
       }, 3000);
     }
 
+    // Функция копирования текста в буфер обмена
     function copyToClipboard(text) {
       navigator.clipboard.writeText(text).then(() => {
         showTemporaryMessage('Координаты скопированы!');
       });
     }
 
-    function buildRoute(lat, lon) {
-      const route = new ymaps.Route([myMap.getCenter(), [lat, lon]]);
-      myMap.geoObjects.add(route);
-      route.model.events.add('requestsuccess', function () {
-        showTemporaryMessage('Маршрут построен!');
-      });
-    }
-
-    function toggleRadius(index) {
-      const circle = radiusObjects[index];
-      const isVisible = circle.options.get('visible');
-      circle.options.set('visible', !isVisible);
-    }
-
-    function toggleLayer(placemarks, type, isVisible) {
-      placemarks.forEach((placemark) => {
-        if (placemark.type === type) {
-          placemark.placemark.options.set('visible', isVisible);
-        }
-      });
-    }
-
+    // Функция добавления пользовательской точки
     function addUserPlacemark(coords) {
       const placemark = new ymaps.Placemark(coords, {
         hintContent: 'Моя точка',
@@ -327,21 +235,25 @@
       }, {
         preset: 'islands#redDotIcon'
       });
+
+      // Находим ближайшую вышку и вычисляем расстояние
+      let nearestDistance = Infinity;
+      placemarks.forEach((placemarkData) => {
+        if (placemarkData.type === 'regular') {
+          const distance = ymaps.coordSystem.geo.getDistance(placemarkData.coords, coords);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+          }
+        }
+      });
+
+      if (nearestDistance < Infinity) {
+        placemark.properties.set('balloonContent', 
+          `Это моя точка на карте!<br>Расстояние до ближайшей вышки: ${Math.round(nearestDistance)} м`);
+      }
+
       myMap.geoObjects.add(placemark);
       userPlacemarks.push(placemark);
-    }
-
-    function searchByIMEI(imei, imeiGroups) {
-      const group = imeiGroups[imei];
-      if (group) {
-        showTemporaryMessage(`Найдено: ${group.towers.length} вышек и ${group.blocks.length} блоков`);
-        group.towers.forEach(tower => {
-          const placemark = new ymaps.Placemark(tower.coords);
-          myMap.geoObjects.add(placemark);
-        });
-      } else {
-        showTemporaryMessage('IMEI не найден');
-      }
     }
   </script>
 </body>
