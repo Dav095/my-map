@@ -229,12 +229,16 @@
           coords,
           {
             hintContent: sourceStr,
-            balloonContent: balloonContent
+            balloonContent
           },
-          { preset: iconPreset }
+          {
+            preset: iconPreset
+          }
         );
 
         myMap.geoObjects.add(placemark);
+        placemarks.push({ type, placemark, circle, coords });
+
         if (isTower) {
           placemarks.push({ type: 'tower', placemark });
         } else if (isBlock) {
