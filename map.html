@@ -230,7 +230,7 @@
         }
 
         if (radius) {
-          balloonContent += `<button class="toggle-btn" onclick="toggleRadius(placemark)">Показать/Скрыть радиус</button>`;
+          balloonContent += `<button class="toggle-btn" onclick="toggleRadius(${index})">Показать/Скрыть радиус</button>`;
         }
 
         balloonContent += `</div>`;
@@ -287,10 +287,11 @@
       clusterer.add(allPlacemarks);
       myMap.geoObjects.add(clusterer);
 
-      window.toggleRadius = function(placemark) {
-        if (placemark.radiusCircle) {
-          const currentVisibility = placemark.radiusCircle.options.get("visible");
-          placemark.radiusCircle.options.set("visible", !currentVisibility);
+      window.toggleRadius = function(index) {
+        const placemarkObj = placemarks[index];
+        if (placemarkObj && placemarkObj.placemark.radiusCircle) {
+          const currentVisibility = placemarkObj.placemark.radiusCircle.options.get("visible");
+          placemarkObj.placemark.radiusCircle.options.set("visible", !currentVisibility);
         }
       };
 
