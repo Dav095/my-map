@@ -223,11 +223,6 @@
             <button class="copy-btn" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">Скопировать координаты</button><br>
         `;
 
-         if (imei) {
-         balloonContent += `<b>IMEI:</b> ${imei}<br>`;
-         }
-
-
         if (type === 'single') {
           balloonContent += `
             <button class="route-btn" onclick="buildRoute(${coords[0]}, ${coords[1]})">Построить маршрут</button><br>
@@ -327,7 +322,7 @@
         // Обновляем видимость пинов
         placemarks.forEach(p => {
           let visible = true;
-          if (p.type === 'tower' && !towersVisible) visible = false;
+          if (p.type === 'regular' && !towersVisible) visible = false; // Обновлено с 'tower' на 'regular'
           if (p.type === 'block' && !blocksVisible) visible = false;
           if (p.type === 'single' && !towersVisible) visible = false; // Одиночные вышки считаем как вышки
           p.placemark.options.set('visible', visible);
@@ -406,7 +401,7 @@
       let minDistance = Infinity;
 
       placemarks.forEach(p => {
-        if (p.type === 'tower' || p.type === 'single') {
+        if (p.type === 'regular' || p.type === 'single') { // Обновлено условие
           const distance = ymaps.coordSystem.geo.getDistance([lat, lon], p.placemark.geometry.getCoordinates());
           if (distance < minDistance) {
             minDistance = distance;
