@@ -124,12 +124,12 @@
     </form>
   </div>
   <script>
-    let myMap; // Объявляем глобальную переменную для карты
+    let myMap; // Глобальная переменная для карты
 
     ymaps.ready(init);
 
     let placemarks = []; // { placemark, imei, type: 'tower'|'block'|'single' }
-    let lines = [];     // { line, imei }
+    let lines = [];     // { line, imei, linkedUserPlacemark }
     let userPlacemarks = []; // { placemark, linkedTower }
 
     function init() {
@@ -155,7 +155,7 @@
         controls: ['zoomControl', 'fullscreenControl']
       });
 
-      const radiusObjects = [];
+      const radiusMap = new Map(); // Связь меток с радиусами
       const isMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
       if (isMobile) {
         myMap.behaviors.disable('scrollZoom');
@@ -203,20 +203,20 @@
               visible: false
             }
           );
-          radiusObjects.push(circle);
           myMap.geoObjects.add(circle);
+          radiusMap.set(index, circle); // Связываем индекс с радиусом
         }
 
-        // Выбираем иконку в зависимости от того, вышка это или блок
+        // Выбираем иконку в зависимости от типа метки
         let iconPreset = isTower ? 'islands#redCircleIcon' : 'islands#blueCircleIcon';
         if (type === 'single') {
           iconPreset = 'islands#orangeCircleIcon'; // Отличаем одиночные вышки другим цветом
         }
 
-        // Формируем содержимое балуна в зависимости от типа пина
+        // Формируем содержимое балуна с экранированием
         let balloonContent = `
           <div class="balloon-content">
-            <b>Источник:</b> ${sourceStr}<br>
+            <b>Источник:</b> ${escapeHtml(sourceStr)}<br>
             ${type !== 'single' ? `<b>Видимых спутников:</b> ${point.gpsInView}<br>` : ''}
             Радиус: ${radius ? radius + " м" : "Не указан"}<br>
             Координаты: ${coords[0]}, ${coords[1]}<br>
@@ -230,7 +230,7 @@
         }
 
         if (radius) {
-          balloonContent += `<button class="toggle-btn" onclick="toggleRadius(${index})">Показать/Скрыть радиус</button>`;
+          balloonContent += `<button class="toggle-btn" onclick="toggleRadius(placemark)">Показать/Скрыть радиус</button>`;
         }
 
         balloonContent += `</div>`;
@@ -238,16 +238,18 @@
         const placemark = new ymaps.Placemark(
           coords,
           {
-            hintContent: sourceStr,
+            hintContent: escapeHtml(sourceStr),
             balloonContent: balloonContent
           },
           { preset: iconPreset }
         );
 
-        myMap.geoObjects.add(placemark);
+        // Связываем метку с радиусом
         if (circle) {
-          myMap.geoObjects.add(circle);
+          placemark.radiusCircle = circle;
         }
+
+        myMap.geoObjects.add(placemark);
 
         placemarks.push({
           placemark,
@@ -257,7 +259,6 @@
       });
 
       // Рисуем линии между вышками и блоками
-      // Используем первую вышку в группе как основную
       for (const imei in imeiGroups) {
         const group = imeiGroups[imei];
         if (group.towers.length > 0 && group.blocks.length > 0) {
@@ -274,10 +275,22 @@
         }
       }
 
-      window.toggleRadius = function(index) {
-        if (radiusObjects[index]) {
-          const currentVisibility = radiusObjects[index].options.get("visible");
-          radiusObjects[index].options.set("visible", !currentVisibility);
+      // Инициализация кластеризатора
+      const clusterer = new ymaps.Clusterer({
+        preset: 'islands#invertedVioletClusterIcons',
+        groupByCoordinates: false,
+        clusterDisableClickZoom: false,
+        clusterHideIconOnBalloonOpen: false
+      });
+
+      const allPlacemarks = placemarks.map(p => p.placemark);
+      clusterer.add(allPlacemarks);
+      myMap.geoObjects.add(clusterer);
+
+      window.toggleRadius = function(placemark) {
+        if (placemark.radiusCircle) {
+          const currentVisibility = placemark.radiusCircle.options.get("visible");
+          placemark.radiusCircle.options.set("visible", !currentVisibility);
         }
       };
 
@@ -322,14 +335,13 @@
         // Обновляем видимость пинов
         placemarks.forEach(p => {
           let visible = true;
-          if (p.type === 'regular' && !towersVisible) visible = false; // Обновлено с 'tower' на 'regular'
+          if (p.type === 'regular' && !towersVisible) visible = false;
           if (p.type === 'block' && !blocksVisible) visible = false;
-          if (p.type === 'single' && !towersVisible) visible = false; // Одиночные вышки считаем как вышки
+          if (p.type === 'single' && !towersVisible) visible = false;
           p.placemark.options.set('visible', visible);
         });
 
         // Обновляем видимость линий
-        // Линия имеет смысл, только если видны и towers, и blocks
         const linesVisible = towersVisible && blocksVisible;
         lines.forEach(l => {
           l.line.options.set('visible', linesVisible);
@@ -339,13 +351,28 @@
       showTowers.addEventListener('change', updateVisibility);
       showBlocks.addEventListener('change', updateVisibility);
 
-      // Поиск по IMEI
+      // Поиск по IMEI с выделением найденных меток
       searchBtn.addEventListener('click', () => {
         const searchImei = imeiSearch.value.trim();
         if (!searchImei) return;
+
         // Находим все точки с этим IMEI
         const found = placemarks.filter(p => p.imei === searchImei);
         if (found.length > 0) {
+          // Удаляем предыдущие выделения
+          placemarks.forEach(p => {
+            if (p.type === 'single') {
+              p.placemark.options.set('preset', 'islands#orangeCircleIcon');
+            } else if (p.type === 'regular') {
+              p.placemark.options.set('preset', 'islands#redCircleIcon');
+            }
+          });
+
+          // Выделяем найденные метки
+          found.forEach(p => {
+            p.placemark.options.set('preset', 'islands#greenCircleIcon');
+          });
+
           // Определяем границы
           const coordsArray = found.map(f => f.placemark.geometry.getCoordinates());
           const bounds = ymaps.util.bounds.fromPoints(coordsArray);
@@ -396,12 +423,26 @@
       myMap.geoObjects.add(userPlacemark);
       userPlacemarks.push({ placemark: userPlacemark, linkedTower: null });
 
-      // Автоматическое связывание с ближайшей вышкой
+      // Добавление обработчика перетаскивания
+      userPlacemark.events.add('dragend', function (e) {
+        updateUserPlacemark(userPlacemark);
+      });
+
+      // Связывание с ближайшей вышкой
+      linkUserPlacemark(userPlacemark, lat, lon);
+
+      // Сброс поля ввода
+      coordsInput.value = '';
+
+      showTemporaryMessage('Пользовательская точка добавлена.');
+    }
+
+    function linkUserPlacemark(userPlacemark, lat, lon) {
       let nearestTower = null;
       let minDistance = Infinity;
 
       placemarks.forEach(p => {
-        if (p.type === 'regular' || p.type === 'single') { // Обновлено условие
+        if (p.type === 'regular' || p.type === 'single') {
           const distance = ymaps.coordSystem.geo.getDistance([lat, lon], p.placemark.geometry.getCoordinates());
           if (distance < minDistance) {
             minDistance = distance;
@@ -418,7 +459,10 @@
           strokeOpacity: 0.7
         });
         myMap.geoObjects.add(line);
-        lines.push({ line, imei: nearestTower.imei });
+        lines.push({ line, imei: nearestTower.imei, linkedUserPlacemark: userPlacemark });
+
+        // Связка метки с вышкой
+        userPlacemark.linkedTower = nearestTower;
 
         // Вычисление расстояния
         const distanceKm = (minDistance / 1000).toFixed(2);
@@ -429,12 +473,33 @@
             <button class="route-btn" onclick="buildRoute(${nearestTower.placemark.geometry.getCoordinates()[0]}, ${nearestTower.placemark.geometry.getCoordinates()[1]})">Построить маршрут</button>
           </div>
         `);
+      } else {
+        showTemporaryMessage('Нет доступных вышек для связывания.');
       }
+    }
 
-      // Сброс поля ввода
-      coordsInput.value = '';
+    function updateUserPlacemark(userPlacemark) {
+      const newCoords = userPlacemark.geometry.getCoordinates();
+      const linkedTower = userPlacemark.linkedTower;
 
-      showTemporaryMessage('Пользовательская точка добавлена.');
+      if (linkedTower) {
+        // Найти соответствующую линию
+        const line = lines.find(l => l.linkedUserPlacemark === userPlacemark);
+        if (line) {
+          // Обновить координаты линии
+          line.line.geometry.setCoordinates([newCoords, linkedTower.placemark.geometry.getCoordinates()]);
+
+          // Пересчитать расстояние
+          const distanceKm = (ymaps.coordSystem.geo.getDistance(newCoords, linkedTower.placemark.geometry.getCoordinates()) / 1000).toFixed(2);
+          userPlacemark.properties.set('balloonContent', `
+            <div class="balloon-content">
+              <b>Ваша позиция</b><br>
+              Расстояние до ближайшей вышки: ${distanceKm} км<br>
+              <button class="route-btn" onclick="buildRoute(${linkedTower.placemark.geometry.getCoordinates()[0]}, ${linkedTower.placemark.geometry.getCoordinates()[1]})">Построить маршрут</button>
+            </div>
+          `);
+        }
+      }
     }
 
     function parseCoordinates(input) {
@@ -443,7 +508,12 @@
       let regexDecimal = /^([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)$/;
       let match = input.match(regexDecimal);
       if (match) {
-        return [parseFloat(match[1]), parseFloat(match[2])];
+        let lat = parseFloat(match[1]);
+        let lon = parseFloat(match[2]);
+        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+          return null; // Координаты вне допустимого диапазона
+        }
+        return [lat, lon];
       }
 
       // Формат 2: "55°45'21\"N 37°36'44\"E"
@@ -452,6 +522,9 @@
       if (match) {
         let lat = dmsToDecimal(match[1], match[2], match[3], match[4].toUpperCase());
         let lon = dmsToDecimal(match[5], match[6], match[7], match[8].toUpperCase());
+        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+          return null; // Координаты вне допустимого диапазона
+        }
         return [lat, lon];
       }
 
@@ -466,6 +539,17 @@
         decimal *= -1;
       }
       return decimal;
+    }
+
+    function escapeHtml(text) {
+      const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      };
+      return text.replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 
     function showTemporaryMessage(message) {
