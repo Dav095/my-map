@@ -275,17 +275,11 @@
         }
       }
 
-      // Инициализация кластеризатора
-      const clusterer = new ymaps.Clusterer({
-        preset: 'islands#invertedVioletClusterIcons',
-        groupByCoordinates: false,
-        clusterDisableClickZoom: false,
-        clusterHideIconOnBalloonOpen: false
+      // Убираем кластеризацию
+      // Вместо этого добавляем все метки напрямую на карту
+      placemarks.forEach(p => {
+        myMap.geoObjects.add(p.placemark);
       });
-
-      const allPlacemarks = placemarks.map(p => p.placemark);
-      clusterer.add(allPlacemarks);
-      myMap.geoObjects.add(clusterer);
 
       window.toggleRadius = function(index) {
         const placemarkObj = placemarks[index];
