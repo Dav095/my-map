@@ -62,13 +62,16 @@
       top: 10px;
       left: 10px;
       background: rgba(255, 255, 255, 0.95);
-      padding: 10px;
+      padding: 15px;
       border-radius: 5px;
       z-index: 999;
-      font-size: 14px;
       font-family: Arial, sans-serif;
-      max-width: 250px;
+      max-width: 280px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      transition: transform 0.3s ease;
+    }
+    .control-panel.collapsed {
+      transform: translateX(-90%);
     }
     .control-panel h3 {
       margin: 0 0 10px 0;
@@ -80,11 +83,10 @@
       margin-bottom: 8px;
       cursor: pointer;
     }
-    .control-panel input[type="text"],
-    .control-panel input[type="number"] {
+    .control-panel input[type="text"] {
       width: 100%;
-      margin-bottom: 8px;
-      padding: 6px;
+      margin-bottom: 10px;
+      padding: 8px;
       box-sizing: border-box;
       border: 1px solid #ddd;
       border-radius: 3px;
@@ -92,13 +94,13 @@
     .control-panel button {
       width: 100%;
       padding: 8px;
-      font-size: 13px;
+      font-size: 14px;
       background-color: #1a73e8;
       color: white;
       border: none;
       cursor: pointer;
       border-radius: 3px;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
     .control-panel button:hover {
       background-color: #0d5bba;
@@ -119,24 +121,38 @@
       border-radius: 50%;
       margin-right: 8px;
     }
+    .coord-input-section {
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #eee;
+    }
+    .toggle-panel {
+      position: absolute;
+      right: -30px;
+      top: 10px;
+      width: 30px;
+      height: 30px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 0 5px 5px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    }
     @media (max-width: 768px) {
       .control-panel {
-        max-width: 200px;
-        font-size: 12px;
-      }
-      .balloon-content {
-        font-size: 12px;
-      }
-      .balloon-btn {
-        padding: 5px 8px;
-        font-size: 11px;
+        max-width: 240px;
+        padding: 10px;
       }
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  
   <div class="control-panel">
+    <div class="toggle-panel" onclick="toggleControlPanel()">≡</div>
     <h3>Управление картой</h3>
     <label><input type="checkbox" id="showTowers" checked> Показать вышки</label>
     <label><input type="checkbox" id="showBlocks" checked> Показать блоки</label>
@@ -145,6 +161,12 @@
     <div style="margin: 10px 0;">
       <input type="text" id="imeiSearch" placeholder="Поиск по IMEI">
       <button id="searchBtn">Найти</button>
+    </div>
+    
+    <div class="coord-input-section">
+      <h3>Добавить точку</h3>
+      <input type="text" id="userCoords" placeholder="Формат: N55.6816 E37.5162">
+      <button id="addPointBtn">Добавить</button>
     </div>
     
     <div class="legend">
@@ -160,15 +182,18 @@
         <div class="legend-color" style="background-color: #00AA00;"></div>
         <span>O2R</span>
       </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #FF00FF;"></div>
+        <span>Ваша точка</span>
+      </div>
     </div>
   </div>
 
   <script>
     let myMap;
     let placemarks = [];
+    let userPlacemark = null;
     let lines = [];
-    let userPlacemarks = [];
-    let o2rPlacemarks = [];
 
     ymaps.ready(init);
 
@@ -180,6 +205,7 @@
       if (dataParam) {
         try {
           towerData = JSON.parse(decodeURIComponent(dataParam));
+          console.log('Загружено точек:', towerData.length); // Логируем количество загруженных точек
         } catch (e) {
           console.error("Ошибка при парсинге данных:", e);
           showTemporaryMessage('Ошибка при загрузке данных карты.');
@@ -195,30 +221,21 @@
         controls: ['zoomControl', 'fullscreenControl']
       });
 
-      // Определяем тип устройства
-      const isMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
-      if (isMobile) {
-        myMap.behaviors.disable('scrollZoom');
-      }
-
       // Обрабатываем каждую точку данных
       towerData.forEach((point, index) => {
         const coords = point.coords;
         const radius = point.radius;
-        const sourceStr = point.source;
+        const sourceStr = point.source || '';
         const type = point.type || 'regular';
         const isO2R = point.taskType && point.taskType.toLowerCase() === 'o2r';
 
-        // Определяем тип метки
+        // Определяем тип и цвет метки
         let isBlock = sourceStr.includes("Блок");
-        let isTower = (sourceStr.includes("Яндекс") || sourceStr.includes("Кэш"));
+        let isTower = sourceStr.includes("Яндекс") || sourceStr.includes("Кэш");
         let preset = 'islands#blueCircleIcon'; // По умолчанию для блоков
 
-        if (isTower) {
-          preset = 'islands#redCircleIcon';
-        } else if (isO2R) {
-          preset = 'islands#greenCircleIcon';
-        }
+        if (isTower) preset = 'islands#redCircleIcon';
+        if (isO2R) preset = 'islands#greenCircleIcon';
 
         // Создаем радиус (если указан)
         let circle = null;
@@ -241,12 +258,6 @@
         let balloonContent = `
           <div class="balloon-content">
             <div class="balloon-title">${escapeHtml(sourceStr)}</div>
-            
-            ${point.vehicleNumber ? `
-              <div class="balloon-field">
-                <b>Госномер:</b> ${escapeHtml(point.vehicleNumber)}
-              </div>
-            ` : ''}
             
             ${point.vehicleName ? `
               <div class="balloon-field">
@@ -277,14 +288,17 @@
             <button class="balloon-btn route" onclick="buildRoute(${coords[0]}, ${coords[1]})">
               Построить маршрут
             </button>
-            
-            ${radius ? `
-              <button class="balloon-btn" onclick="toggleRadius(${index})">
-                ${circle.options.get('visible') ? 'Скрыть радиус' : 'Показать радиус'}
-              </button>
-            ` : ''}
-          </div>
         `;
+
+        if (radius) {
+          balloonContent += `
+            <button class="balloon-btn" onclick="toggleRadius(${index})">
+              ${circle ? (circle.options.get('visible') ? 'Скрыть радиус' : 'Показать радиус') : ''}
+            </button>
+          `;
+        }
+
+        balloonContent += `</div>`;
 
         // Создаем метку
         const placemark = new ymaps.Placemark(
@@ -306,28 +320,81 @@
 
         myMap.geoObjects.add(placemark);
 
-        // Сохраняем метку в соответствующем массиве
-        const placemarkObj = {
+        // Сохраняем метку
+        placemarks.push({
           placemark,
           type: isO2R ? 'o2r' : (isTower ? 'tower' : 'block'),
           imei: point.imei,
-          index
-        };
+          index,
+          coords
+        });
+      });
 
-        placemarks.push(placemarkObj);
+      // Создаем линии между вышками и блоками с одинаковым IMEI
+      createLinesBetweenTowersAndBlocks();
+
+      // Настройка элементов управления
+      setupControls();
+    }
+
+    function createLinesBetweenTowersAndBlocks() {
+      // Группируем метки по IMEI
+      const imeiGroups = {};
+      
+      placemarks.forEach(p => {
+        if (!p.imei) return;
         
-        if (isO2R) {
-          o2rPlacemarks.push(placemarkObj);
+        if (!imeiGroups[p.imei]) {
+          imeiGroups[p.imei] = {
+            towers: [],
+            blocks: []
+          };
+        }
+        
+        if (p.type === 'tower') {
+          imeiGroups[p.imei].towers.push(p);
+        } else if (p.type === 'block') {
+          imeiGroups[p.imei].blocks.push(p);
         }
       });
 
-      // Настройка фильтров
+      // Создаем линии между вышками и блоками с одинаковым IMEI
+      for (const imei in imeiGroups) {
+        const group = imeiGroups[imei];
+        
+        group.towers.forEach(tower => {
+          group.blocks.forEach(block => {
+            const line = new ymaps.Polyline(
+              [tower.coords, block.coords],
+              {},
+              {
+                strokeColor: "#FF0000",
+                strokeWidth: 2,
+                strokeOpacity: 0.5
+              }
+            );
+            myMap.geoObjects.add(line);
+            lines.push({
+              line,
+              imei,
+              towerIndex: tower.index,
+              blockIndex: block.index
+            });
+          });
+        });
+      }
+    }
+
+    function setupControls() {
       const showTowers = document.getElementById('showTowers');
       const showBlocks = document.getElementById('showBlocks');
       const showO2R = document.getElementById('showO2R');
       const imeiSearch = document.getElementById('imeiSearch');
       const searchBtn = document.getElementById('searchBtn');
+      const userCoordsInput = document.getElementById('userCoords');
+      const addPointBtn = document.getElementById('addPointBtn');
 
+      // Обновление видимости меток и линий
       function updateVisibility() {
         const towersVisible = showTowers.checked;
         const blocksVisible = showBlocks.checked;
@@ -342,16 +409,17 @@
           
           p.placemark.options.set('visible', visible);
           
-          // Скрываем/показываем радиусы
           if (p.placemark.radiusCircle) {
             p.placemark.radiusCircle.options.set('visible', visible && p.placemark.radiusCircle.options.get('visible'));
           }
         });
-      }
 
-      showTowers.addEventListener('change', updateVisibility);
-      showBlocks.addEventListener('change', updateVisibility);
-      showO2R.addEventListener('change', updateVisibility);
+        // Обновляем видимость линий
+        const linesVisible = towersVisible && blocksVisible;
+        lines.forEach(l => {
+          l.line.options.set('visible', linesVisible);
+        });
+      }
 
       // Поиск по IMEI
       searchBtn.addEventListener('click', () => {
@@ -362,16 +430,12 @@
         if (found.length > 0) {
           // Сбрасываем все выделения
           placemarks.forEach(p => {
-            if (p.type === 'tower') {
-              p.placemark.options.set('preset', 'islands#redCircleIcon');
-            } else if (p.type === 'block') {
-              p.placemark.options.set('preset', 'islands#blueCircleIcon');
-            } else if (p.type === 'o2r') {
-              p.placemark.options.set('preset', 'islands#greenCircleIcon');
-            }
+            if (p.type === 'tower') p.placemark.options.set('preset', 'islands#redCircleIcon');
+            if (p.type === 'block') p.placemark.options.set('preset', 'islands#blueCircleIcon');
+            if (p.type === 'o2r') p.placemark.options.set('preset', 'islands#greenCircleIcon');
           });
 
-          // Выделяем найденные
+          // Выделяем найденные фиолетовым
           found.forEach(p => {
             p.placemark.options.set('preset', 'islands#violetCircleIcon');
           });
@@ -387,8 +451,127 @@
         }
       });
 
+      // Добавление пользовательской точки
+      addPointBtn.addEventListener('click', addUserPoint);
+
+      // Обработчик нажатия Enter в поле ввода координат
+      userCoordsInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          addUserPoint();
+        }
+      });
+
+      // Обработчики изменений
+      showTowers.addEventListener('change', updateVisibility);
+      showBlocks.addEventListener('change', updateVisibility);
+      showO2R.addEventListener('change', updateVisibility);
+
       // Инициализация видимости
       updateVisibility();
+    }
+
+    function addUserPoint() {
+      const coordsText = document.getElementById('userCoords').value.trim();
+      if (!coordsText) {
+        showTemporaryMessage('Введите координаты');
+        return;
+      }
+
+      const coords = parseCoordinates(coordsText);
+      if (!coords) {
+        showTemporaryMessage('Неверный формат координат. Пример: N55.6816 E37.5162');
+        return;
+      }
+
+      // Удаляем предыдущую пользовательскую метку
+      if (userPlacemark) {
+        myMap.geoObjects.remove(userPlacemark);
+      }
+
+      // Создаем новую метку
+      userPlacemark = new ymaps.Placemark(
+        coords,
+        {
+          hintContent: 'Ваша точка',
+          balloonContent: `
+            <div class="balloon-content">
+              <div class="balloon-title">Ваша точка</div>
+              <div class="balloon-field">
+                <b>Координаты:</b> ${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}
+              </div>
+              <button class="balloon-btn copy" onclick="copyToClipboard('${coords[0]}, ${coords[1]}')">
+                Скопировать координаты
+              </button>
+            </div>
+          `
+        },
+        {
+          preset: 'islands#violetIcon',
+          draggable: true
+        }
+      );
+
+      myMap.geoObjects.add(userPlacemark);
+      myMap.setCenter(coords, 15);
+      document.getElementById('userCoords').value = '';
+      showTemporaryMessage('Точка добавлена на карту');
+    }
+
+    // Функция для парсинга координат из разных форматов
+    function parseCoordinates(input) {
+      // 1. Проверяем формат "N55.6816 E37.5162"
+      let letterFormat = /^\s*([NS])\s*(\d{1,2}\.?\d*)[, ]?\s*([EW])\s*(\d{1,3}\.?\d*)\s*$/i;
+      let match = input.match(letterFormat);
+      if (match) {
+        let lat = parseFloat(match[2]);
+        let lon = parseFloat(match[4]);
+        
+        if (match[1].toUpperCase() === 'S') lat = -lat;
+        if (match[3].toUpperCase() === 'W') lon = -lon;
+        
+        if (isValidCoord(lat, lon)) return [lat, lon];
+      }
+
+      // 2. Проверяем формат "55.7558, 37.6177" или "55.7558 37.6177"
+      let decimalRegex = /^\s*([-+]?\d{1,2}\.?\d*)[,\s]\s*([-+]?\d{1,3}\.?\d*)\s*$/;
+      match = input.match(decimalRegex);
+      if (match) {
+        const lat = parseFloat(match[1]);
+        const lon = parseFloat(match[2]);
+        if (isValidCoord(lat, lon)) return [lat, lon];
+      }
+
+      // 3. Проверяем формат градусы-минуты-секунды: 55°45'21"N 37°36'44"E
+      let dmsRegex = /^\s*([-+]?\d{1,3})°\s*(\d{1,2})['′]\s*(\d{1,2}(?:\.\d+)?)?["″]?\s*([NS]?)\s*[, ]\s*([-+]?\d{1,3})°\s*(\d{1,2})['′]\s*(\d{1,2}(?:\.\d+)?)?["″]?\s*([EW]?)\s*$/i;
+      match = input.match(dmsRegex);
+      if (match) {
+        let lat = parseDMS(match[1], match[2], match[3], match[4]);
+        let lon = parseDMS(match[5], match[6], match[7], match[8]);
+        if (isValidCoord(lat, lon)) return [lat, lon];
+      }
+
+      return null;
+    }
+
+    function parseDMS(deg, min, sec, dir) {
+      let degrees = parseFloat(deg);
+      let minutes = parseFloat(min || 0);
+      let seconds = parseFloat(sec || 0);
+      let decimal = degrees + minutes/60 + seconds/3600;
+      
+      // Учитываем направление (N/S/E/W)
+      if (dir) {
+        dir = dir.toUpperCase();
+        if (dir === 'S' || dir === 'W') {
+          decimal = -decimal;
+        }
+      }
+      
+      return decimal;
+    }
+
+    function isValidCoord(lat, lon) {
+      return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
     }
 
     // Глобальные функции
@@ -414,6 +597,11 @@
       } else {
         window.open(`https://yandex.ru/maps/?ll=${lon},${lat}&z=16&mode=routes`, '_blank');
       }
+    };
+
+    window.toggleControlPanel = function() {
+      const panel = document.querySelector('.control-panel');
+      panel.classList.toggle('collapsed');
     };
 
     function escapeHtml(text) {
