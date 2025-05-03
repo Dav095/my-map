@@ -199,13 +199,33 @@
 
     function init() {
       const urlParams = new URLSearchParams(window.location.search);
-      const dataParam = urlParams.get('data');
+      const dataParam = urlParams.get('data') || urlParams.get('d'); // Поддержка старого и нового формата
       let towerData = [];
       
       if (dataParam) {
         try {
-          towerData = JSON.parse(decodeURIComponent(dataParam));
-          console.log('Загружено точек:', towerData.length); // Логируем количество загруженных точек
+          const parsedData = JSON.parse(decodeURIComponent(dataParam));
+          
+          // Обработка нового компактного формата
+          if (parsedData.t && Array.isArray(parsedData.p)) {
+            towerData = parsedData.p.map(point => ({
+              coords: point.c || [0, 0],
+              source: point.s || (point.t === 'o2r' ? 'O2R' : 'Неизвестно'),
+              radius: point.r || null,
+              type: 'regular',
+              imei: point.i || '',
+              vehicleName: point.v || '',
+              vehicleNumber: point.n || '',
+              taskType: point.t === 'o2r' ? 'o2r' : '',
+              gpsInView: point.g || ''
+            }));
+          } 
+          // Обработка старого формата
+          else if (Array.isArray(parsedData)) {
+            towerData = parsedData;
+          }
+          
+          console.log('Загружено точек:', towerData.length);
         } catch (e) {
           console.error("Ошибка при парсинге данных:", e);
           showTemporaryMessage('Ошибка при загрузке данных карты.');
@@ -223,6 +243,8 @@
 
       // Обрабатываем каждую точку данных
       towerData.forEach((point, index) => {
+        if (!point.coords || point.coords.length !== 2) return;
+        
         const coords = point.coords;
         const radius = point.radius;
         const sourceStr = point.source || '';
@@ -265,6 +287,12 @@
               </div>
             ` : ''}
             
+            ${point.vehicleNumber ? `
+              <div class="balloon-field">
+                <b>Номер:</b> ${escapeHtml(point.vehicleNumber)}
+              </div>
+            ` : ''}
+            
             <div class="balloon-field">
               <b>Координаты:</b> ${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}
             </div>
@@ -278,6 +306,12 @@
             ${point.gpsInView ? `
               <div class="balloon-field">
                 <b>Спутники:</b> ${point.gpsInView}
+              </div>
+            ` : ''}
+            
+            ${point.imei ? `
+              <div class="balloon-field">
+                <b>IMEI:</b> ${escapeHtml(point.imei)}
               </div>
             ` : ''}
             
@@ -426,7 +460,7 @@
         const searchImei = imeiSearch.value.trim();
         if (!searchImei) return;
 
-        const found = placemarks.filter(p => p.imei === searchImei);
+        const found = placemarks.filter(p => p.imei && p.imei.toString() === searchImei);
         if (found.length > 0) {
           // Сбрасываем все выделения
           placemarks.forEach(p => {
