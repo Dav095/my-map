@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>????? O2R</title>
+  <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; }
+    #map { width: 100%; height: 100%; }
+    .balloon { font-family: Arial, sans-serif; padding: 10px; max-width: 300px; }
+    .balloon-title { font-weight: bold; margin-bottom: 5px; color: #1a73e8; }
+    .balloon-content { font-size: 14px; }
+    .balloon-row { margin-bottom: 3px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    ymaps.ready(initMap);
+    
+    function initMap() {
+      const points = [{"coords":[55.9805,37.4266],"color":"islands#blueIcon","source":"???? O2R","imei":860103062903571,"vehicleName":"Nissan Qashqai ?961??797","pin":"","type":"block","gpsInView":14},{"coords":[55.83660888671875,37.346412658691406],"color":"islands#redIcon","source":"????? O2R","radius":1552,"imei":860103062903571,"vehicleName":"Nissan Qashqai ?961??797","pin":"","type":"tower","gpsInView":14},{"coords":[55.6576,37.208],"color":"islands#blueIcon","source":"???? O2R","imei":860103063060082,"vehicleName":"Chery Arrizo 8 ?050??797","pin":"","type":"block","gpsInView":12},{"coords":[55.660301208496094,37.2093620300293],"color":"islands#redIcon","source":"????? O2R","radius":768,"imei":860103063060082,"vehicleName":"Chery Arrizo 8 ?050??797","pin":"","type":"tower","gpsInView":12},{"coords":[55.69313430786133,37.628292083740234],"color":"islands#redIcon","source":"????? O2R","radius":1538,"imei":860103063140108,"vehicleName":"Chery Tiggo 7 Pro ?436??797","pin":"","type":"tower","gpsInView":5},{"coords":[59.7855,30.1463],"color":"islands#blueIcon","source":"???? O2R","imei":860103063257274,"vehicleName":"Chery Tiggo 7 Pro ?890??797","pin":"","type":"block","gpsInView":13},{"coords":[59.78374099731445,30.14215850830078],"color":"islands#redIcon","source":"????? O2R","radius":1406,"imei":860103063257274,"vehicleName":"Chery Tiggo 7 Pro ?890??797","pin":"","type":"tower","gpsInView":13},{"coords":[55.398231506347656,37.773536682128906],"color":"islands#redIcon","source":"????? O2R","radius":1000,"imei":860103064149017,"vehicleName":"Kia Soul ?868??797","pin":"","type":"tower","gpsInView":11},{"coords":[59.98893737792969,29.7731990814209],"color":"islands#redIcon","source":"????? O2R","radius":908,"imei":861100067930954,"vehicleName":"Geely Atlas Pro ?086??797","pin":"","type":"tower","gpsInView":""},{"coords":[55.70967102050781,37.634666442871094],"color":"islands#redIcon","source":"????? O2R","radius":1218,"imei":861100068007323,"vehicleName":"Coolray (BelGee) ?727??797","pin":"","type":"tower","gpsInView":8},{"coords":[55.761802673339844,37.68473434448242],"color":"islands#redIcon","source":"????? O2R","radius":651,"imei":862430050188065,"vehicleName":"Chery Tiggo 7 Pro ?152??797","pin":"","type":"tower","gpsInView":2},{"coords":[56.330570220947266,43.9055290222168],"color":"islands#redIcon","source":"????? O2R","radius":1502,"imei":862430050905468,"vehicleName":"Renault Arkana ?622??797","pin":"","type":"tower","gpsInView":""},{"coords":[55.7495,37.6428],"color":"islands#blueIcon","source":"???? O2R","imei":862430052772205,"vehicleName":"Changan UNI-V ?292??797","pin":"","type":"block","gpsInView":15},{"coords":[55.71397018432617,37.614192962646484],"color":"islands#redIcon","source":"????? O2R","radius":631,"imei":862430052772205,"vehicleName":"Changan UNI-V ?292??797","pin":"","type":"tower","gpsInView":15},{"coords":[55.762935638427734,37.72459411621094],"color":"islands#redIcon","source":"????? O2R","radius":1402,"imei":862430054354721,"vehicleName":"Coolray (BelGee) ?376??797","pin":"","type":"tower","gpsInView":7},{"coords":[55.644256591796875,37.76008224487305],"color":"islands#redIcon","source":"????? O2R","radius":1380,"imei":862430054364779,"vehicleName":"Nissan Qashqai ?469??797","pin":"","type":"tower","gpsInView":7},{"coords":[55.9801,37.4246],"color":"islands#blueIcon","source":"???? O2R","imei":862430055999466,"vehicleName":"Jac JS4 ?013??797","pin":"","type":"block","gpsInView":13},{"coords":[55.81726837158203,37.42698287963867],"color":"islands#redIcon","source":"????? O2R","radius":517,"imei":862430055999466,"vehicleName":"Jac JS4 ?013??797","pin":"","type":"tower","gpsInView":13},{"coords":[55.91253662109375,37.780094146728516],"color":"islands#redIcon","source":"????? O2R","radius":918,"imei":862430056670439,"vehicleName":"Kia Rio ?024??797","pin":"","type":"tower","gpsInView":10},{"coords":[55.4742,37.7034],"color":"islands#blueIcon","source":"???? O2R","imei":862430056699461,"vehicleName":"Kia Sportage ?896??797","pin":"","type":"block","gpsInView":12},{"coords":[55.47284698486328,37.70317077636719],"color":"islands#redIcon","source":"????? O2R","radius":568,"imei":862430056699461,"vehicleName":"Kia Sportage ?896??797","pin":"","type":"tower","gpsInView":12},{"coords":[59.6279,30.3996],"color":"islands#blueIcon","source":"???? O2R","imei":862531047192019,"vehicleName":"Chery Tiggo 7 Pro ?961??797","pin":"","type":"block","gpsInView":13},{"coords":[59.62552261352539,30.39401626586914],"color":"islands#redIcon","source":"????? O2R","radius":1251,"imei":862531047192019,"vehicleName":"Chery Tiggo 7 Pro ?961??797","pin":"","type":"tower","gpsInView":13},{"coords":[55.798057556152344,37.5217170715332],"color":"islands#redIcon","source":"????? O2R","radius":739,"imei":862531047195590,"vehicleName":"Kia Rio ?296??797","pin":"","type":"tower","gpsInView":1},{"coords":[55.7475,37.643],"color":"islands#blueIcon","source":"???? O2R","imei":862549049547840,"vehicleName":"Changan UNI-V ?466??797","pin":"","type":"block","gpsInView":10},{"coords":[55.74661636352539,37.71382522583008],"color":"islands#redIcon","source":"????? O2R","radius":1138,"imei":862549049547840,"vehicleName":"Changan UNI-V ?466??797","pin":"","type":"tower","gpsInView":10},{"coords":[55.72468948364258,37.568355560302734],"color":"islands#redIcon","source":"????? O2R","radius":755,"imei":862843046791927,"vehicleName":"Geely Coolray ?114??797","pin":"","type":"tower","gpsInView":9},{"coords":[55.7201,37.4512],"color":"islands#blueIcon","source":"???? O2R","imei":864626045065213,"vehicleName":"Changan Alsvin ?117??797","pin":"","type":"block","gpsInView":21},{"coords":[55.71918869018555,37.451377868652344],"color":"islands#redIcon","source":"????? O2R","radius":810,"imei":864626045065213,"vehicleName":"Changan Alsvin ?117??797","pin":"","type":"tower","gpsInView":21},{"coords":[55.8137,37.7463],"color":"islands#blueIcon","source":"???? O2R","imei":866011051451789,"vehicleName":"Haval Jolion Elite ?981??797","pin":"","type":"block","gpsInView":14},{"coords":[55.818790435791016,37.7591667175293],"color":"islands#redIcon","source":"????? O2R","radius":131,"imei":866011051451789,"vehicleName":"Haval Jolion Elite ?981??797","pin":"","type":"tower","gpsInView":14},{"coords":[55.655982971191406,37.84721755981445],"color":"islands#redIcon","source":"????? O2R","radius":131,"imei":866011051460186,"vehicleName":"Chery Tiggo 7 Pro ?443??797","pin":"","type":"tower","gpsInView":21},{"coords":[55.67792510986328,37.534706115722656],"color":"islands#redIcon","source":"????? O2R","radius":131,"imei":866011051465060,"vehicleName":"Coolray (BelGee) ?899??797","pin":"","type":"tower","gpsInView":17},{"coords":[55.5206,37.6408],"color":"islands#blueIcon","source":"???? O2R","imei":866011051465433,"vehicleName":"Kia Rio ?315??797","pin":"","type":"block","gpsInView":12},{"coords":[55.53866958618164,37.617801666259766],"color":"islands#redIcon","source":"????? O2R","radius":131,"imei":866011051465433,"vehicleName":"Kia Rio ?315??797","pin":"","type":"tower","gpsInView":12},{"coords":[55.73650360107422,37.676509857177734],"color":"islands#redIcon","source":"????? O2R","radius":131,"imei":866011051793735,"vehicleName":"Exeed LX ?202??797","pin":"","type":"tower","gpsInView":17},{"coords":[55.98130416870117,37.408447265625],"color":"islands#redIcon","source":"????? O2R","radius":131,"imei":866011051808327,"vehicleName":"Haval Jolion Elite ?149??797","pin":"","type":"tower","gpsInView":""},{"coords":[55.79495620727539,37.5256233215332],"color":"islands#redIcon","source":"????? O2R","radius":131,"imei":866011051850238,"vehicleName":"Chery Arrizo 8 ?967??797","pin":"","type":"tower","gpsInView":21},{"coords":[60.030792236328125,30.29691505432129],"color":"islands#redIcon","source":"????? O2R","radius":131,"imei":866011051851913,"vehicleName":"Geely Atlas Pro ?182??797","pin":"","type":"tower","gpsInView":""},{"coords":[55.742618560791016,37.66279602050781],"color":"islands#redIcon","source":"????? O2R","radius":131,"imei":866011051903805,"vehicleName":"Jac JS6 ?288??797","pin":"","type":"tower","gpsInView":14},{"coords":[55.73395538330078,37.67484664916992],"color":"islands#redIcon","source":"????? O2R","radius":131,"imei":866011051909950,"vehicleName":"Geely Coolray New ?547??797","pin":"","type":"tower","gpsInView":20},{"coords":[55.738487243652344,37.64220428466797],"color":"islands#redIcon","source":"????? O2R","radius":131,"imei":866011052366556,"vehicleName":"Kia Rio ?467??797","pin":"","type":"tower","gpsInView":14},{"coords":[55.75312423706055,37.69982147216797],"color":"islands#redIcon","source":"????? O2R","radius":516,"imei":866897054151701,"vehicleName":"Chery Tiggo 7 Pro ?049??797","pin":"","type":"tower","gpsInView":8},{"coords":[55.762054443359375,37.73917770385742],"color":"islands#redIcon","source":"????? O2R","radius":616,"imei":866897054220571,"vehicleName":"Exeed LX ?601??797","pin":"","type":"tower","gpsInView":10},{"coords":[55.91413116455078,37.84501647949219],"color":"islands#redIcon","source":"????? O2R","radius":1202,"imei":866897056059647,"vehicleName":"Changan CS55 Plus ?044??797","pin":"","type":"tower","gpsInView":15},{"coords":[55.9797,37.4264],"color":"islands#blueIcon","source":"???? O2R","imei":869627030156533,"vehicleName":"Chery Tiggo 7 Pro ?201??797","pin":"","type":"block","gpsInView":12},{"coords":[55.82767105102539,37.42493438720703],"color":"islands#redIcon","source":"????? O2R","radius":792,"imei":869627030156533,"vehicleName":"Chery Tiggo 7 Pro ?201??797","pin":"","type":"tower","gpsInView":12},{"coords":[60.01974105834961,30.265668869018555],"color":"islands#redIcon","source":"????? O2R","radius":1284,"imei":869696045843013,"vehicleName":"Geely Coolray ?518??797","pin":"","type":"tower","gpsInView":16}];
+      const map = new ymaps.Map("map", {
+        center: [55.751574, 37.573856],
+        zoom: 10
+      });
+      
+      // ????????? ????? ?? ?????
+      points.forEach(point => {
+        const placemark = new ymaps.Placemark(
+          point.coords,
+          {
+            balloonContentHeader: '<div class="balloon-title">' + point.source + '</div>',
+            balloonContentBody: `
+              <div class="balloon">
+                ${point.vehicleName ? '<div class="balloon-row"><strong>??????:</strong> ' + point.vehicleName + '</div>' : ''}
+                ${point.radius ? '<div class="balloon-row"><strong>????????:</strong> ' + point.radius + ' ?</div>' : ''}
+                <div class="balloon-row"><strong>??????????:</strong> ${point.coords[0].toFixed(6)}, ${point.coords[1].toFixed(6)}</div>
+              </div>
+            `,
+            hintContent: point.source
+          },
+          {
+            preset: point.color,
+            balloonCloseButton: true,
+            balloonMaxWidth: 300
+          }
+        );
+        
+        // ??? ????? ????????? ???? ????????
+        if (point.radius && point.type === "tower") {
+          const circle = new ymaps.Circle([
+            point.coords,
+            point.radius
+          ], {}, {
+            fillColor: "#FF0000",
+            fillOpacity: 0.1,
+            strokeColor: "#FF0000",
+            strokeOpacity: 0.8,
+            strokeWidth: 2
+          });
+          map.geoObjects.add(circle);
+        }
+        
+        map.geoObjects.add(placemark);
+      });
+      
+      // ????????????? ????????? ??????? ? ?????
+      if (points.length > 0) {
+        map.setBounds(map.geoObjects.getBounds(), { checkZoomRange: true });
+      }
+    }
+  </script>
+</body>
+</html>
