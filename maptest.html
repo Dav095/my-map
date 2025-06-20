@@ -62,45 +62,63 @@
       top: 10px;
       left: 10px;
       background: rgba(255, 255, 255, 0.95);
-      padding: 15px;
+      padding: 10px;
       border-radius: 5px;
       z-index: 999;
       font-family: Arial, sans-serif;
-      max-width: 280px;
+      width: 200px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
       transition: transform 0.3s ease;
     }
     .control-panel.collapsed {
-      transform: translateX(-90%);
+      transform: translateX(-85%);
+      width: 30px;
+      overflow: hidden;
+    }
+    .control-panel.collapsed h3,
+    .control-panel.collapsed input,
+    .control-panel.collapsed button,
+    .control-panel.collapsed .filter-section,
+    .control-panel.collapsed .search-section,
+    .control-panel.collapsed .legend {
+      display: none;
+    }
+    .toggle-panel {
+      position: absolute;
+      right: -30px;
+      top: 0;
+      width: 30px;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 0 5px 5px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     }
     .control-panel h3 {
-      margin: 0 0 10px 0;
-      font-size: 16px;
-      color: #1a73e8;
-    }
-    .control-panel label {
-      display: block;
-      margin-bottom: 8px;
-      cursor: pointer;
+      margin: 0 0 8px 0;
+      font-size: 14px;
     }
     .control-panel input[type="text"] {
       width: 100%;
-      margin-bottom: 10px;
-      padding: 8px;
+      margin-bottom: 8px;
+      padding: 6px;
+      font-size: 12px;
       box-sizing: border-box;
       border: 1px solid #ddd;
       border-radius: 3px;
     }
     .control-panel button {
       width: 100%;
-      padding: 8px;
-      font-size: 14px;
+      padding: 6px;
+      font-size: 12px;
       background-color: #1a73e8;
       color: white;
       border: none;
       cursor: pointer;
       border-radius: 3px;
-      margin-bottom: 10px;
     }
     .control-panel button:hover {
       background-color: #0d5bba;
@@ -109,6 +127,7 @@
       margin-top: 15px;
       border-top: 1px solid #eee;
       padding-top: 10px;
+      font-size: 12px;
     }
     .legend-item {
       display: flex;
@@ -121,29 +140,22 @@
       border-radius: 50%;
       margin-right: 8px;
     }
-    .coord-input-section {
-      margin-top: 15px;
-      padding-top: 10px;
-      border-top: 1px solid #eee;
+    .filter-section {
+      margin-bottom: 10px;
     }
-    .toggle-panel {
-      position: absolute;
-      right: -30px;
-      top: 10px;
-      width: 30px;
-      height: 30px;
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 0 5px 5px 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .search-section {
+      margin: 10px 0;
+    }
+    .control-panel label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 12px;
       cursor: pointer;
-      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     }
     @media (max-width: 768px) {
       .control-panel {
-        max-width: 240px;
-        padding: 10px;
+        width: 180px;
+        padding: 8px;
       }
     }
   </style>
@@ -154,16 +166,19 @@
   <div class="control-panel">
     <div class="toggle-panel" onclick="toggleControlPanel()">≡</div>
     <h3>Управление картой</h3>
-    <label><input type="checkbox" id="showTowers" checked> Показать вышки</label>
-    <label><input type="checkbox" id="showBlocks" checked> Показать блоки</label>
-    <label><input type="checkbox" id="showO2R" checked> Показать O2R</label>
     
-    <div style="margin: 10px 0;">
+    <div class="filter-section">
+      <label><input type="checkbox" id="showTowers" checked> Вышки</label>
+      <label><input type="checkbox" id="showBlocks" checked> Блоки</label>
+      <label><input type="checkbox" id="showO2R" checked> O2R</label>
+    </div>
+    
+    <div class="search-section">
       <input type="text" id="imeiSearch" placeholder="Поиск по IMEI">
       <button id="searchBtn">Найти</button>
     </div>
     
-    <div class="coord-input-section">
+    <div>
       <h3>Добавить точку</h3>
       <input type="text" id="userCoords" placeholder="Формат: N55.6816 E37.5162">
       <button id="addPointBtn">Добавить</button>
@@ -194,19 +209,19 @@
     let placemarks = [];
     let userPlacemark = null;
     let lines = [];
+    let circles = [];
 
     ymaps.ready(init);
 
     function init() {
       const urlParams = new URLSearchParams(window.location.search);
-      const dataParam = urlParams.get('data') || urlParams.get('d'); // Поддержка старого и нового формата
+      const dataParam = urlParams.get('data') || urlParams.get('d');
       let towerData = [];
       
       if (dataParam) {
         try {
           const parsedData = JSON.parse(decodeURIComponent(dataParam));
           
-          // Обработка нового компактного формата
           if (parsedData.t && Array.isArray(parsedData.p)) {
             towerData = parsedData.p.map(point => ({
               coords: point.c || [0, 0],
@@ -219,9 +234,7 @@
               taskType: point.t === 'o2r' ? 'o2r' : '',
               gpsInView: point.g || ''
             }));
-          } 
-          // Обработка старого формата
-          else if (Array.isArray(parsedData)) {
+          } else if (Array.isArray(parsedData)) {
             towerData = parsedData;
           }
           
@@ -267,13 +280,14 @@
             {},
             {
               fillOpacity: 0,
-              strokeColor: "#0000FF",
+              strokeColor: "#FF0000",
               strokeOpacity: 0.8,
               strokeWidth: 2,
               visible: false
             }
           );
           myMap.geoObjects.add(circle);
+          circles.push(circle);
         }
 
         // Формируем содержимое балуна
